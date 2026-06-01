@@ -1,12 +1,122 @@
 // In development .env is loaded; in a packaged build config.js is used.
 try { require('dotenv').config(); } catch {}
 
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
-const path = require('path');
-const fs = require('fs');
+const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+const path   = require('path');
+const fs     = require('fs');
+const crypto = require('crypto');
 const AdmZip = require('adm-zip');
 const { autoUpdater } = require('electron-updater');
 const { createClient } = require('@supabase/supabase-js');
+
+// ==========================================
+// E2EE CRYPTO HELPERS
+// ==========================================
+
+// ── Key storage (private key stays on-device, never sent to server) ──
+function getKeyPath(userId) {
+  return path.join(app.getPath('userData'), 'keys', `${userId}.json`);
+}
+function loadLocalKeys(userId) {
+  try { return JSON.parse(fs.readFileSync(getKeyPath(userId), 'utf8')); }
+  catch { return null; }
+}
+function saveLocalKeys(userId, keys) {
+  const p = getKeyPath(userId);
+  fs.mkdirSync(path.dirname(p), { recursive: true });
+  fs.writeFileSync(p, JSON.stringify(keys), { mode: 0o600 }); // owner-only permissions
+}
+
+// ── RSA-OAEP: wraps/unwraps the per-conversation AES key ──
+function rsaEncrypt(publicKeyPem, plainBase64) {
+  return crypto.publicEncrypt(
+    { key: publicKeyPem, padding: crypto.constants.RSA_PKCS1_OAEP_PADDING, oaepHash: 'sha256' },
+    Buffer.from(plainBase64, 'base64')
+  ).toString('base64');
+}
+function rsaDecrypt(privateKeyPem, cipherBase64) {
+  return crypto.privateDecrypt(
+    { key: privateKeyPem, padding: crypto.constants.RSA_PKCS1_OAEP_PADDING, oaepHash: 'sha256' },
+    Buffer.from(cipherBase64, 'base64')
+  ).toString('base64');
+}
+
+// ── AES-256-GCM: encrypts/decrypts message content ──
+function aesEncrypt(keyBase64, plaintext) {
+  const key = Buffer.from(keyBase64, 'base64');
+  const iv  = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  const ct  = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  // Layout: [iv 12B][tag 16B][ciphertext]
+  return Buffer.concat([iv, tag, ct]).toString('base64');
+}
+function aesDecrypt(keyBase64, encBase64) {
+  const key  = Buffer.from(keyBase64, 'base64');
+  const data = Buffer.from(encBase64, 'base64');
+  const iv   = data.subarray(0, 12);
+  const tag  = data.subarray(12, 28);
+  const ct   = data.subarray(28);
+  const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+  decipher.setAuthTag(tag);
+  return Buffer.concat([decipher.update(ct), decipher.final()]).toString('utf8');
+}
+
+// ── Conversation key cache (in-memory, cleared on restart) ──
+const convKeyCache = new Map();
+function convCacheKey(a, b) { return a < b ? `${a}:${b}` : `${b}:${a}`; }
+
+async function getOrCreateConvKey(myId, partnerId) {
+  const cacheK = convCacheKey(myId, partnerId);
+  if (convKeyCache.has(cacheK)) return convKeyCache.get(cacheK);
+
+  const myKeys = loadLocalKeys(myId);
+  if (!myKeys) throw new Error('Local keypair missing — log out and back in to regenerate.');
+
+  // Canonical ordering required by the DB constraint
+  const [u1, u2] = myId < partnerId ? [myId, partnerId] : [partnerId, myId];
+  const iAmUser1 = (myId === u1);
+
+  // Try to fetch an existing conversation key
+  const { data: existing } = await supabase
+    .from('conversation_keys')
+    .select('key_for_user1, key_for_user2')
+    .eq('user1_id', u1)
+    .eq('user2_id', u2)
+    .maybeSingle();
+
+  if (existing) {
+    const encForMe = iAmUser1 ? existing.key_for_user1 : existing.key_for_user2;
+    const aesKey = rsaDecrypt(myKeys.privateKey, encForMe);
+    convKeyCache.set(cacheK, aesKey);
+    return aesKey;
+  }
+
+  // No key exists yet — create one
+  const { data: partnerProfile } = await supabase
+    .from('profiles')
+    .select('public_key')
+    .eq('id', partnerId)
+    .maybeSingle();
+
+  if (!partnerProfile?.public_key) {
+    throw new Error('The other user has not set up encryption yet. Ask them to log in once.');
+  }
+
+  const aesKey       = crypto.randomBytes(32).toString('base64');
+  const myPubKey     = myKeys.publicKey;
+  const theirPubKey  = partnerProfile.public_key;
+
+  await supabase.from('conversation_keys').insert({
+    user1_id:      u1,
+    user2_id:      u2,
+    key_for_user1: rsaEncrypt(iAmUser1 ? myPubKey : theirPubKey, aesKey),
+    key_for_user2: rsaEncrypt(iAmUser1 ? theirPubKey : myPubKey, aesKey),
+  });
+
+  convKeyCache.set(cacheK, aesKey);
+  return aesKey;
+}
 
 // ==========================================
 // SUPABASE INITIALIZATION
@@ -46,8 +156,10 @@ function loadSession() {
 // ==========================================
 // WINDOW CREATION & APP LIFECYCLE
 // ==========================================
+let mainWindow = null;
+
 function createWindow() {
-  const win = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1200,
     height: 750,
     minWidth: 920,
@@ -65,22 +177,73 @@ function createWindow() {
     }
   });
 
-  win.loadFile('index.html');
+  mainWindow.loadFile('index.html');
+}
+
+function sendUpdateStatus(payload) {
+  mainWindow?.webContents.send('update-status', payload);
+}
+
+function initAutoUpdater() {
+  // Skip entirely in development — checkForUpdates always fails outside a packaged app
+  if (!app.isPackaged) return;
+
+  // Route all internal updater messages to electron-log for diagnostics
+  const log = require('electron-log');
+  autoUpdater.logger = log;
+  log.transports.file.level = 'info';
+  log.info('Auto-updater initialising. App version:', app.getVersion());
+
+  autoUpdater.autoDownload    = true;   // download as soon as update is found
+  autoUpdater.allowPrerelease = false;  // only full releases, not pre-releases
+
+  autoUpdater.on('checking-for-update', () => {
+    log.info('Checking for update…');
+    sendUpdateStatus({ type: 'checking' });
+  });
+
+  autoUpdater.on('update-available', (info) => {
+    log.info('Update available:', info.version);
+    sendUpdateStatus({ type: 'available', version: info.version });
+  });
+
+  autoUpdater.on('update-not-available', (info) => {
+    log.info('No update available. Current version is latest:', info.version);
+    sendUpdateStatus({ type: 'up-to-date' });
+  });
+
+  autoUpdater.on('download-progress', (progress) => {
+    log.info(`Download progress: ${Math.round(progress.percent)}%`);
+    sendUpdateStatus({ type: 'downloading', percent: Math.round(progress.percent) });
+  });
+
+  autoUpdater.on('update-downloaded', (info) => {
+    log.info('Update downloaded:', info.version);
+    sendUpdateStatus({ type: 'ready', version: info.version });
+    dialog.showMessageBox(mainWindow, {
+      type: 'info',
+      title: 'Update Ready',
+      message: `FFXI Addon HUB ${info.version} is ready to install.`,
+      detail: 'Restart the app now to apply the update.',
+      buttons: ['Restart Now', 'Later'],
+      defaultId: 0,
+      cancelId: 1,
+    }).then(({ response }) => {
+      if (response === 0) autoUpdater.quitAndInstall();
+    });
+  });
+
+  autoUpdater.on('error', (err) => {
+    log.error('Auto-updater error:', err.message);
+    sendUpdateStatus({ type: 'error', message: err.message });
+  });
+
+  autoUpdater.checkForUpdates();
 }
 
 app.whenReady().then(() => {
   createWindow();
-
-  // Initialize the auto-updater
-  autoUpdater.checkForUpdatesAndNotify();
-
-  autoUpdater.on('update-available', () => {
-    console.log('A new version of the manager is available. Downloading...');
-  });
-
-  autoUpdater.on('update-downloaded', () => {
-    console.log('Update downloaded. It will be installed on restart.');
-  });
+  initAutoUpdater();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -210,6 +373,35 @@ ipcMain.handle('login-user', async (event, { email, password }) => {
 // ==========================================
 // DATABASE & REVIEW HANDLERS
 // ==========================================
+
+// App version
+ipcMain.handle('get-app-version', () => app.getVersion());
+
+// Log file path — shown in Settings so users can find it for debugging
+ipcMain.handle('get-log-path', () => {
+  try {
+    const log = require('electron-log');
+    return log.transports.file.getFile().path;
+  } catch {
+    return null;
+  }
+});
+
+// Open a file's containing folder in Explorer/Finder
+ipcMain.handle('show-in-folder', (_event, filePath) => {
+  shell.showItemInFolder(filePath);
+});
+
+// Manual update check triggered from Settings UI
+ipcMain.handle('check-for-updates', async () => {
+  if (!app.isPackaged) return { message: 'Auto-updates only work in the installed app, not in dev mode.' };
+  try {
+    await autoUpdater.checkForUpdates();
+    return { message: 'Checking…' };
+  } catch (err) {
+    return { message: `Error: ${err.message}` };
+  }
+});
 
 // ==========================================
 // FRIENDS HANDLERS
@@ -498,7 +690,7 @@ ipcMain.handle('get-conversations', async (event, userId) => {
   }
 });
 
-// Get Messages between two users
+// Get Messages between two users (decrypt content before returning)
 ipcMain.handle('get-messages', async (event, { userId, partnerId }) => {
   try {
     const { data, error } = await supabase
@@ -509,19 +701,61 @@ ipcMain.handle('get-messages', async (event, { userId, partnerId }) => {
       .order('created_at', { ascending: true });
 
     if (error) throw error;
-    return { success: true, data };
+
+    // Attempt to get the conversation key for decryption
+    let aesKey = null;
+    try { aesKey = await getOrCreateConvKey(userId, partnerId); } catch {}
+
+    const decrypted = data.map(msg => {
+      if (msg.content.startsWith('enc:') && aesKey) {
+        try {
+          return { ...msg, content: aesDecrypt(aesKey, msg.content.slice(4)) };
+        } catch {
+          return { ...msg, content: '[Could not decrypt — key mismatch]' };
+        }
+      }
+      return msg; // legacy plaintext messages shown as-is
+    });
+
+    return { success: true, data: decrypted };
   } catch (error) {
     console.error('get-messages error:', error.message);
     return { success: false, error: error.message };
   }
 });
 
-// Send a Message
+// Ensure user has an RSA keypair — generate locally if missing, sync public key to DB
+ipcMain.handle('ensure-keypair', async (event, userId) => {
+  try {
+    let keys = loadLocalKeys(userId);
+    if (!keys) {
+      keys = crypto.generateKeyPairSync('rsa', {
+        modulusLength: 2048,
+        publicKeyEncoding:  { type: 'spki',   format: 'pem' },
+        privateKeyEncoding: { type: 'pkcs8',  format: 'pem' },
+      });
+      saveLocalKeys(userId, keys);
+    }
+    // Always push the public key to the profile (idempotent)
+    const { error } = await supabase
+      .from('profiles')
+      .upsert({ id: userId, public_key: keys.publicKey });
+    if (error) console.error('Failed to save public key:', error.message);
+    return { success: true };
+  } catch (error) {
+    console.error('ensure-keypair error:', error.message);
+    return { success: false, error: error.message };
+  }
+});
+
+// Send a Message (content encrypted with AES-256-GCM before storage)
 ipcMain.handle('send-message', async (event, { senderId, receiverId, content }) => {
   try {
+    const aesKey    = await getOrCreateConvKey(senderId, receiverId);
+    const encrypted = 'enc:' + aesEncrypt(aesKey, content);
     const { error } = await supabase
       .from('messages')
-      .insert({ sender_id: senderId, receiver_id: receiverId, content });
+      .insert({ sender_id: senderId, receiver_id: receiverId, content: encrypted });
     if (error) throw error;
     return { success: true };
   } catch (error) {

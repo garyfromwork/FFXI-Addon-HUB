@@ -574,8 +574,23 @@
             <div class="psec-title">About</div>
             <div style="font-size:13px;color:var(--text-sub);line-height:2;">
               <div><strong style="color:var(--text);">FFXI Addon HUB</strong></div>
-              <div>Vana'diel Addon Hub &nbsp;·&nbsp; v1.0.0</div>
+              <div>Version <span id="settings-version">—</span></div>
               <div>Electron + Supabase</div>
+            </div>
+          </div>
+
+          <div class="psec wide">
+            <div class="psec-title">Updates</div>
+            <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px;">
+              <button class="btn btn-outline" id="btn-check-updates">Check for Updates</button>
+              <div style="font-size:13px;" id="update-status-text"></div>
+            </div>
+            <div style="font-size:12px;color:var(--text-muted);line-height:2;border-top:1px solid var(--border);padding-top:14px;">
+              <div style="font-weight:700;color:var(--text-sub);margin-bottom:6px;">If updates aren't working, verify:</div>
+              <div>1. The GitHub release is <strong style="color:var(--text);">Published</strong> — not a Draft and not marked Pre-release</div>
+              <div>2. The release assets include <code style="background:var(--bg-input);padding:1px 5px;border-radius:3px;">latest.yml</code> — it must be attached alongside the .exe</div>
+              <div>3. The installed app version is <strong style="color:var(--text);">lower</strong> than the new release version in package.json</div>
+              <div style="margin-top:10px;">Log file: <span id="update-log-path" style="font-family:monospace;color:var(--accent);cursor:pointer;" title="Click to open">—</span></div>
             </div>
           </div>
 
@@ -1255,6 +1270,8 @@
       setAvatar(document.getElementById('sb-avatar-el'), S.profile?.avatar_url, displayName);
 
       document.getElementById('btn-open-submit')?.classList.remove('hidden');
+      // Generate RSA key pair on first login — runs silently, private key stays on this device
+      window.electronAPI.ensureKeypair(res.id).catch(console.error);
       if (showWelcome) toast(`Welcome, ${displayName}!`);
       loadAddons();
       loadFriendsData();
@@ -1364,6 +1381,14 @@
           </div>
 
           <div class="psec wide">
+            <div class="psec-title">End-to-End Encryption</div>
+            <div style="display:flex;align-items:center;gap:10px;font-size:13px;color:var(--text-sub);">
+              <span style="font-size:18px;" id="e2ee-icon">⏳</span>
+              <span id="e2ee-status">Checking encryption keys…</span>
+            </div>
+          </div>
+
+          <div class="psec wide">
             <div class="psec-title">Private Notes</div>
             <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">Only visible to you — great for tracking addon configs, keybinds, or personal tips.</div>
             <textarea id="edit-notes" class="ft" style="min-height:100px" placeholder="Addon configs, tips, reminders…">${esc(p.notes || '')}</textarea>
@@ -1376,6 +1401,22 @@
       // Live name preview
       document.getElementById('edit-username').addEventListener('input', e => {
         document.getElementById('profile-name-display').textContent = e.target.value || name;
+      });
+
+      // E2EE key status
+      window.electronAPI.ensureKeypair(S.user.id).then(res => {
+        const icon   = document.getElementById('e2ee-icon');
+        const status = document.getElementById('e2ee-status');
+        if (!icon || !status) return;
+        if (res.success) {
+          icon.textContent   = '🔒';
+          status.textContent = 'Your messages are end-to-end encrypted. Your private key is stored only on this device.';
+          status.style.color = 'var(--green)';
+        } else {
+          icon.textContent   = '⚠';
+          status.textContent = 'Encryption key error: ' + (res.error || 'unknown');
+          status.style.color = 'var(--red)';
+        }
       });
 
       // Load profile stats asynchronously
@@ -2279,6 +2320,60 @@
     function stopBgPoll() {
       clearInterval(S.bgPollTimer); S.bgPollTimer = null;
     }
+
+    // ────────────────────────────────────────────
+    // AUTO-UPDATER
+    // ────────────────────────────────────────────
+    function setUpdateStatus(text, color = 'var(--text-sub)') {
+      const el = document.getElementById('update-status-text');
+      if (el) { el.textContent = text; el.style.color = color; }
+    }
+
+    window.electronAPI.onUpdateStatus(data => {
+      switch (data.type) {
+        case 'checking':
+          setUpdateStatus('Checking for updates…');
+          break;
+        case 'available':
+          setUpdateStatus(`v${data.version} available — downloading…`, 'var(--accent)');
+          toast(`Update v${data.version} found — downloading in background.`);
+          break;
+        case 'downloading':
+          setUpdateStatus(`Downloading update… ${data.percent}%`, 'var(--accent)');
+          break;
+        case 'ready':
+          setUpdateStatus(`v${data.version} ready — restart to install`, 'var(--green)');
+          break;
+        case 'up-to-date':
+          setUpdateStatus('You\'re on the latest version.', 'var(--green)');
+          break;
+        case 'error':
+          setUpdateStatus(`Update error: ${data.message}`, 'var(--red)');
+          break;
+      }
+    });
+
+    document.getElementById('btn-check-updates').addEventListener('click', async () => {
+      const btn = document.getElementById('btn-check-updates');
+      btn.disabled = true;
+      setUpdateStatus('Checking…');
+      const res = await window.electronAPI.checkForUpdates();
+      if (res?.message) setUpdateStatus(res.message);
+      setTimeout(() => { btn.disabled = false; }, 3000);
+    });
+
+    // Populate app version and log path in Settings
+    window.electronAPI.getAppVersion().then(v => {
+      const el = document.getElementById('settings-version');
+      if (el) el.textContent = `v${v}`;
+    });
+    window.electronAPI.getLogPath().then(p => {
+      const el = document.getElementById('update-log-path');
+      if (!el || !p) return;
+      el.textContent = p;
+      el.title = 'Click to open folder';
+      el.addEventListener('click', () => window.electronAPI.showInFolder(p));
+    });
 
     // ────────────────────────────────────────────
     // INIT

@@ -1,6 +1,6 @@
 {
   "name": "ffxi-addon-hub",
-  "version": "1.0.2",
+  "version": "1.0.5",
   "description": "FFXI Windower Addon Manager",
   "main": "main.js",
   "author": "Garyfromwork",
