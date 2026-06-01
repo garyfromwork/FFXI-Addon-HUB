@@ -211,6 +211,85 @@ ipcMain.handle('login-user', async (event, { email, password }) => {
 // DATABASE & REVIEW HANDLERS
 // ==========================================
 
+// ==========================================
+// FRIENDS HANDLERS
+// ==========================================
+
+// Get all friendship data for a user in one call
+ipcMain.handle('get-friends-data', async (event, userId) => {
+  try {
+    const { data: rows, error } = await supabase
+      .from('friendships')
+      .select('*')
+      .or(`requester_id.eq.${userId},addressee_id.eq.${userId}`);
+    if (error) throw error;
+
+    // Fetch profiles for all other parties
+    const otherIds = [...new Set(rows.map(r => r.requester_id === userId ? r.addressee_id : r.requester_id))];
+    const { data: profiles } = otherIds.length
+      ? await supabase.from('profiles').select('id, username, avatar_url').in('id', otherIds)
+      : { data: [] };
+    const pm = Object.fromEntries((profiles || []).map(p => [p.id, p]));
+
+    const friends = [], incoming = [], outgoing = [];
+    for (const r of rows) {
+      const otherId = r.requester_id === userId ? r.addressee_id : r.requester_id;
+      const entry = { ...r, profile: pm[otherId] || { id: otherId, username: 'Unknown', avatar_url: null } };
+      if (r.status === 'accepted') friends.push(entry);
+      else if (r.status === 'pending' && r.addressee_id === userId) incoming.push(entry);
+      else if (r.status === 'pending' && r.requester_id === userId) outgoing.push(entry);
+    }
+    return { success: true, friends, incoming, outgoing };
+  } catch (error) {
+    console.error('get-friends-data error:', error.message);
+    return { success: false, friends: [], incoming: [], outgoing: [] };
+  }
+});
+
+// Send a friend request
+ipcMain.handle('send-friend-request', async (event, { requesterId, addresseeId }) => {
+  try {
+    const { error } = await supabase
+      .from('friendships')
+      .insert({ requester_id: requesterId, addressee_id: addresseeId, status: 'pending' });
+    if (error) throw error;
+    return { success: true };
+  } catch (error) {
+    console.error('send-friend-request error:', error.message);
+    return { success: false, error: error.message };
+  }
+});
+
+// Accept or decline a friend request
+ipcMain.handle('respond-friend-request', async (event, { friendshipId, status }) => {
+  try {
+    const { error } = await supabase
+      .from('friendships')
+      .update({ status })
+      .eq('id', friendshipId);
+    if (error) throw error;
+    return { success: true };
+  } catch (error) {
+    console.error('respond-friend-request error:', error.message);
+    return { success: false, error: error.message };
+  }
+});
+
+// Remove a friend or cancel/decline a request
+ipcMain.handle('remove-friend', async (event, friendshipId) => {
+  try {
+    const { error } = await supabase
+      .from('friendships')
+      .delete()
+      .eq('id', friendshipId);
+    if (error) throw error;
+    return { success: true };
+  } catch (error) {
+    console.error('remove-friend error:', error.message);
+    return { success: false, error: error.message };
+  }
+});
+
 // Bulk-insert addons (used by the GitHub importer)
 ipcMain.handle('bulk-submit-addons', async (event, addons) => {
   try {

@@ -395,6 +395,38 @@
     .user-result-name { font-size: 13px; font-weight: 500; }
 
     .nav-badge { background: var(--red); color: #fff; border-radius: 20px; padding: 1px 6px; font-size: 10px; font-weight: 700; margin-left: auto; line-height: 1.5; }
+
+    /* ── Friends ── */
+    .friends-section-label {
+      font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .7px;
+      color: var(--text-muted); margin: 22px 0 10px; display: flex; align-items: center; gap: 8px;
+    }
+    .friends-section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+    .friend-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(255px, 1fr)); gap: 10px; }
+
+    .friend-card {
+      background: var(--bg-elevated); border: 1px solid var(--border);
+      border-radius: var(--r-lg); padding: 13px 15px;
+      display: flex; align-items: center; gap: 12px; transition: border-color .12s;
+    }
+    .friend-card:hover { border-color: var(--accent); }
+    .friend-card.request { border-color: rgba(201,162,39,.28); }
+    .friend-av {
+      width: 44px; height: 44px; border-radius: 50%; background: var(--purple); flex-shrink: 0;
+      background-size: cover; background-position: center;
+      display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 17px; color: #fff;
+    }
+    .friend-info { flex: 1; min-width: 0; }
+    .friend-name { font-weight: 600; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .friend-sub { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+    .friend-actions { display: flex; gap: 6px; flex-shrink: 0; }
+
+    .fr-search-result {
+      display: flex; align-items: center; gap: 12px;
+      background: var(--bg-elevated); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 10px 14px;
+    }
   </style>
 </head>
 <body>
@@ -421,6 +453,10 @@
         </button>
         <button class="nav-btn" data-view="profile">
           <span class="nav-icon">◎</span> Profile
+        </button>
+        <button class="nav-btn" data-view="friends">
+          <span class="nav-icon">⊕</span> Friends
+          <span class="nav-badge hidden" id="friends-badge">0</span>
         </button>
         <button class="nav-btn" data-view="messages">
           <span class="nav-icon">✉</span> Messages
@@ -492,6 +528,21 @@
       <!-- Profile View -->
       <div id="view-profile" class="view">
         <!-- rendered dynamically -->
+      </div>
+
+      <!-- Friends View -->
+      <div id="view-friends" class="view">
+        <div class="vh">
+          <div>
+            <div class="vh-title">Friends</div>
+            <div class="vh-sub">Connect with other players in the community</div>
+          </div>
+        </div>
+        <div class="search-row" style="max-width:480px;">
+          <input type="text" id="friends-search-input" class="search-input" placeholder="Search for players by username…">
+        </div>
+        <div id="friends-search-results" class="hidden" style="display:flex;flex-direction:column;gap:8px;margin-bottom:4px;max-width:480px;"></div>
+        <div id="friends-main-content"></div>
       </div>
 
       <!-- Settings View -->
@@ -759,6 +810,7 @@
       if (name === 'profile')  renderProfileView();
       if (name === 'library')  renderLibrary();
       if (name === 'settings') updateSettingsPathBar();
+      if (name === 'friends')  onFriendsView();
       if (name === 'messages') onMessagesView();
       else stopMsgPoll();
     }
@@ -1205,13 +1257,15 @@
       document.getElementById('btn-open-submit')?.classList.remove('hidden');
       if (showWelcome) toast(`Welcome, ${displayName}!`);
       loadAddons();
+      loadFriendsData();
       startBgPoll();
     }
 
     document.getElementById('btn-signout').addEventListener('click', async () => {
       await window.electronAPI.logoutUser();
-      S.user = null; S.profile = null; S.activePartner = null;
+      S.user = null; S.profile = null; S.activePartner = null; S.friendsData = null;
       document.getElementById('btn-open-submit')?.classList.add('hidden');
+      document.getElementById('friends-badge').classList.add('hidden');
       stopBgPoll(); stopMsgPoll();
       document.getElementById('sb-signin-wrap').classList.remove('hidden');
       document.getElementById('sb-user').classList.add('hidden');
@@ -1417,11 +1471,239 @@
         document.getElementById('importer-overlay').classList.add('hidden');
       }
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
-        const views = ['browse', 'library', 'profile', 'messages'];
+        const views = ['browse', 'library', 'profile', 'friends', 'messages'];
         const idx = parseInt(e.key) - 1;
         if (idx >= 0 && idx < views.length) { e.preventDefault(); switchView(views[idx]); }
       }
     });
+
+    // ────────────────────────────────────────────
+    // FRIENDS
+    // ────────────────────────────────────────────
+    S.friendsData = null; // { friends, incoming, outgoing }
+
+    async function loadFriendsData() {
+      if (!S.user) return;
+      const res = await window.electronAPI.getFriendsData(S.user.id);
+      if (!res.success) return;
+      S.friendsData = res;
+
+      // Update badge with incoming request count
+      const badge = document.getElementById('friends-badge');
+      const count = res.incoming.length;
+      if (count > 0) { badge.textContent = count; badge.classList.remove('hidden'); }
+      else badge.classList.add('hidden');
+    }
+
+    function onFriendsView() {
+      if (!S.user) {
+        document.getElementById('friends-main-content').innerHTML = `
+          <div class="empty-state">
+            <div class="empty-icon">⊕</div>
+            <div style="margin-bottom:14px;">Sign in to add friends.</div>
+            <button class="btn btn-primary" onclick="document.getElementById('auth-overlay').classList.remove('hidden')">Sign In</button>
+          </div>`;
+        return;
+      }
+      loadFriendsData().then(renderFriendsMain);
+    }
+
+    function renderFriendsMain() {
+      const container = document.getElementById('friends-main-content');
+      if (!S.friendsData) { container.innerHTML = '<div class="loading-state">Loading…</div>'; return; }
+
+      const { friends, incoming, outgoing } = S.friendsData;
+      let html = '';
+
+      if (incoming.length) {
+        html += `<div class="friends-section-label">Pending Requests — ${incoming.length}</div>
+          <div class="friend-grid">`;
+        for (const r of incoming) {
+          const name = r.profile?.username || 'Unknown';
+          const url  = r.profile?.avatar_url || '';
+          html += `
+            <div class="friend-card request">
+              <div class="friend-av" ${url ? `style="background-image:url('${esc(url)}')"` : ''}>${url ? '' : esc(name[0].toUpperCase())}</div>
+              <div class="friend-info">
+                <div class="friend-name">${esc(name)}</div>
+                <div class="friend-sub">Wants to be friends</div>
+              </div>
+              <div class="friend-actions">
+                <button class="btn btn-success btn-sm" data-accept="${esc(r.id)}">✓</button>
+                <button class="btn btn-danger btn-sm" data-decline="${esc(r.id)}">✗</button>
+              </div>
+            </div>`;
+        }
+        html += '</div>';
+      }
+
+      if (outgoing.length) {
+        html += `<div class="friends-section-label">Sent Requests</div>
+          <div class="friend-grid">`;
+        for (const r of outgoing) {
+          const name = r.profile?.username || 'Unknown';
+          const url  = r.profile?.avatar_url || '';
+          html += `
+            <div class="friend-card">
+              <div class="friend-av" ${url ? `style="background-image:url('${esc(url)}')"` : ''}>${url ? '' : esc(name[0].toUpperCase())}</div>
+              <div class="friend-info">
+                <div class="friend-name">${esc(name)}</div>
+                <div class="friend-sub">Request pending</div>
+              </div>
+              <div class="friend-actions">
+                <button class="btn btn-ghost btn-sm" data-cancel="${esc(r.id)}">Cancel</button>
+              </div>
+            </div>`;
+        }
+        html += '</div>';
+      }
+
+      if (friends.length) {
+        html += `<div class="friends-section-label">Friends — ${friends.length}</div>
+          <div class="friend-grid">`;
+        for (const r of friends) {
+          const name = r.profile?.username || 'Unknown';
+          const url  = r.profile?.avatar_url || '';
+          html += `
+            <div class="friend-card">
+              <div class="friend-av" ${url ? `style="background-image:url('${esc(url)}')"` : ''}>${url ? '' : esc(name[0].toUpperCase())}</div>
+              <div class="friend-info">
+                <div class="friend-name">${esc(name)}</div>
+              </div>
+              <div class="friend-actions">
+                <button class="btn btn-ghost btn-sm" data-dm-friend="${esc(r.profile?.id)}" data-dm-name="${esc(name)}" data-dm-avatar="${esc(url)}">✉</button>
+                <button class="btn btn-danger btn-sm" data-unfriend="${esc(r.id)}">Remove</button>
+              </div>
+            </div>`;
+        }
+        html += '</div>';
+      }
+
+      if (!incoming.length && !outgoing.length && !friends.length) {
+        html = `<div class="empty-state"><div class="empty-icon">⊕</div>No friends yet — search for players above to get started.</div>`;
+      }
+
+      container.innerHTML = html;
+
+      // Bind action buttons via delegation
+      container.addEventListener('click', handleFriendCardClick);
+    }
+
+    async function handleFriendCardClick(e) {
+      const acceptBtn   = e.target.closest('[data-accept]');
+      const declineBtn  = e.target.closest('[data-decline]');
+      const cancelBtn   = e.target.closest('[data-cancel]');
+      const unfriendBtn = e.target.closest('[data-unfriend]');
+      const dmBtn       = e.target.closest('[data-dm-friend]');
+
+      if (acceptBtn) {
+        acceptBtn.disabled = true;
+        await window.electronAPI.respondFriendRequest({ friendshipId: acceptBtn.dataset.accept, status: 'accepted' });
+        await loadFriendsData(); renderFriendsMain();
+        toast('Friend request accepted!');
+      } else if (declineBtn) {
+        declineBtn.disabled = true;
+        await window.electronAPI.respondFriendRequest({ friendshipId: declineBtn.dataset.decline, status: 'declined' });
+        await loadFriendsData(); renderFriendsMain();
+      } else if (cancelBtn) {
+        cancelBtn.disabled = true;
+        await window.electronAPI.removeFriend(cancelBtn.dataset.cancel);
+        await loadFriendsData(); renderFriendsMain();
+      } else if (unfriendBtn) {
+        if (!confirm('Remove this friend?')) return;
+        unfriendBtn.disabled = true;
+        await window.electronAPI.removeFriend(unfriendBtn.dataset.unfriend);
+        await loadFriendsData(); renderFriendsMain();
+        toast('Friend removed.');
+      } else if (dmBtn) {
+        S.activePartner = { id: dmBtn.dataset.dmFriend, username: dmBtn.dataset.dmName, avatar_url: dmBtn.dataset.dmAvatar };
+        switchView('messages');
+      }
+    }
+
+    // Friends search
+    let friendsSearchDebounce;
+    document.getElementById('friends-search-input').addEventListener('input', e => {
+      clearTimeout(friendsSearchDebounce);
+      const q = e.target.value.trim();
+      const resultsEl = document.getElementById('friends-search-results');
+      if (!q) { resultsEl.classList.add('hidden'); resultsEl.innerHTML = ''; return; }
+      friendsSearchDebounce = setTimeout(() => doFriendSearch(q), 300);
+    });
+
+    async function doFriendSearch(query) {
+      if (!S.user) return;
+      const resultsEl = document.getElementById('friends-search-results');
+      resultsEl.classList.remove('hidden');
+      resultsEl.innerHTML = '<div style="font-size:12px;color:var(--text-muted);padding:6px 0;">Searching…</div>';
+
+      const res = await window.electronAPI.searchUsers({ query, currentUserId: S.user.id });
+      if (!res.success || !res.data.length) {
+        resultsEl.innerHTML = '<div style="font-size:12px;color:var(--text-muted);padding:6px 0;">No players found.</div>';
+        return;
+      }
+
+      // Build a lookup of existing relationships from cached friendsData
+      const relMap = {};
+      if (S.friendsData) {
+        for (const r of [...(S.friendsData.friends || []), ...(S.friendsData.incoming || []), ...(S.friendsData.outgoing || [])]) {
+          const otherId = r.profile?.id;
+          if (otherId) relMap[otherId] = r;
+        }
+      }
+
+      resultsEl.innerHTML = '';
+      for (const user of res.data) {
+        const row = document.createElement('div');
+        row.className = 'fr-search-result';
+        const name = user.username || 'Unknown';
+        const url  = user.avatar_url || '';
+        const rel  = relMap[user.id];
+
+        let actionHTML = '';
+        if (!rel) {
+          actionHTML = `<button class="btn btn-primary btn-sm js-add-friend" data-id="${esc(user.id)}" data-name="${esc(name)}">Add Friend</button>`;
+        } else if (rel.status === 'accepted') {
+          actionHTML = `<span style="font-size:12px;color:var(--green);font-weight:600;">✓ Friends</span>`;
+        } else if (rel.status === 'pending' && rel.addressee_id === S.user.id) {
+          actionHTML = `<button class="btn btn-success btn-sm js-accept-fr" data-id="${esc(rel.id)}">Accept</button>`;
+        } else if (rel.status === 'pending') {
+          actionHTML = `<span style="font-size:12px;color:var(--text-muted);">Request sent</span>`;
+        }
+
+        row.innerHTML = `
+          <div class="friend-av" style="width:36px;height:36px;font-size:14px;${url ? `background-image:url('${esc(url)}')` : ''}">${url ? '' : esc(name[0].toUpperCase())}</div>
+          <div style="flex:1;font-weight:600;font-size:13px;">${esc(name)}</div>
+          ${actionHTML}
+        `;
+        resultsEl.appendChild(row);
+      }
+
+      // Bind add friend buttons
+      resultsEl.querySelectorAll('.js-add-friend').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          btn.disabled = true; btn.textContent = 'Sending…';
+          const res2 = await window.electronAPI.sendFriendRequest({ requesterId: S.user.id, addresseeId: btn.dataset.id });
+          if (res2.success) {
+            btn.textContent = 'Request Sent'; btn.className = 'btn btn-ghost btn-sm';
+            toast(`Friend request sent to ${btn.dataset.name}!`);
+            await loadFriendsData();
+          } else {
+            toast(res2.error || 'Failed to send request.', true);
+            btn.disabled = false; btn.textContent = 'Add Friend';
+          }
+        });
+      });
+      resultsEl.querySelectorAll('.js-accept-fr').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          btn.disabled = true;
+          await window.electronAPI.respondFriendRequest({ friendshipId: btn.dataset.id, status: 'accepted' });
+          await loadFriendsData(); renderFriendsMain();
+          toast('Friend request accepted!');
+          doFriendSearch(document.getElementById('friends-search-input').value.trim());
+        });
+      });
+    }
 
     // ────────────────────────────────────────────
     // GITHUB IMPORTER
@@ -1990,7 +2272,9 @@
     S.bgPollTimer = null;
     function startBgPoll() {
       if (S.bgPollTimer) return;
-      S.bgPollTimer = setInterval(() => { if (S.user) loadConversations(); }, 30000);
+      S.bgPollTimer = setInterval(() => {
+        if (S.user) { loadConversations(); loadFriendsData(); }
+      }, 30000);
     }
     function stopBgPoll() {
       clearInterval(S.bgPollTimer); S.bgPollTimer = null;

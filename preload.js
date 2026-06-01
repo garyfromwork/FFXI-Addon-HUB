@@ -22,5 +22,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getSession:        ()       => ipcRenderer.invoke('get-session'),
   getReviewCount:    (userId) => ipcRenderer.invoke('get-review-count', userId),
   submitAddon:       (data)   => ipcRenderer.invoke('submit-addon', data),
-  bulkSubmitAddons:  (list)   => ipcRenderer.invoke('bulk-submit-addons', list),
+  bulkSubmitAddons:    (list)   => ipcRenderer.invoke('bulk-submit-addons', list),
+  getFriendsData:      (userId) => ipcRenderer.invoke('get-friends-data', userId),
+  sendFriendRequest:   (data)   => ipcRenderer.invoke('send-friend-request', data),
+  respondFriendRequest:(data)   => ipcRenderer.invoke('respond-friend-request', data),
+  removeFriend:        (id)     => ipcRenderer.invoke('remove-friend', id),
 });

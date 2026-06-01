@@ -8,9 +8,19 @@ Built with **Electron** and **Supabase**.
 
 ## Download
 
-Go to the [**Releases**](../../releases/latest) page and download the latest `FFXI-Addon-HUB-Setup-x.x.x.exe`.
+Go to the [**Releases**](../../releases/latest) page and grab the file for your platform:
 
-Run the installer — it creates a Start Menu shortcut and desktop icon. The app checks for updates automatically on every launch.
+| Platform | File |
+|---|---|
+| Windows | `FFXI-Addon-HUB-Setup-x.x.x.exe` |
+| Linux | `FFXI-Addon-HUB-x.x.x.AppImage` |
+
+**Windows:** Run the installer — it creates a Start Menu shortcut and desktop icon.
+
+**Linux:** Make the AppImage executable and run it: `chmod +x FFXI-Addon-HUB-*.AppImage && ./FFXI-Addon-HUB-*.AppImage`
+If you run FFXI through Wine, point the Windower path to your Wine prefix location (e.g. `~/.wine/drive_c/Windower`).
+
+The app checks for updates automatically on every launch.
 
 > **No account or setup required to browse.** Sign up for a free account inside the app to install addons, leave reviews, and message other users.
 

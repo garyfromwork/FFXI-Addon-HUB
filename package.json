@@ -29,12 +29,7 @@
     },
     "win": {
       "target": [
-        {
-          "target": "nsis",
-          "arch": [
-            "x64"
-          ]
-        }
+        { "target": "nsis", "arch": ["x64"] }
       ],
       "icon": "assets/icon.ico"
     },
@@ -44,6 +39,14 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "FFXI Addon HUB"
+    },
+    "linux": {
+      "target": [
+        { "target": "AppImage", "arch": ["x64"] }
+      ],
+      "icon": "assets/icon.png",
+      "category": "Game",
+      "description": "FFXI Windower Addon Manager"
     }
   },
   "devDependencies": {
