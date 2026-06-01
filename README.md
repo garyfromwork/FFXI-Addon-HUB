@@ -6,6 +6,16 @@ Built with **Electron** and **Supabase**.
 
 ---
 
+## Download
+
+Go to the [**Releases**](../../releases/latest) page and download the latest `FFXI-Addon-HUB-Setup-x.x.x.exe`.
+
+Run the installer — it creates a Start Menu shortcut and desktop icon. The app checks for updates automatically on every launch.
+
+> **No account or setup required to browse.** Sign up for a free account inside the app to install addons, leave reviews, and message other users.
+
+---
+
 ## Features
 
 - **Browse & Search** — Browse all community addons with live search and sorting (A–Z, by author, etc.)
@@ -15,87 +25,79 @@ Built with **Electron** and **Supabase**.
 - **User Profiles** — Avatar upload, bio, and private notes that sync across devices
 - **Direct Messaging** — Send DMs to other users directly from the app
 - **Submit Addons** — Any logged-in user can submit a new addon via a form with GitHub auto-fill
-- **Import from GitHub** — Bulk-import all repos tagged `windower-addon` on GitHub with one click
-- **Auto-updates** — The app updates itself silently in the background using GitHub Releases
+- **Auto-updates** — The app updates itself silently in the background
 - **Keyboard shortcuts** — `Ctrl+1` Browse · `Ctrl+2` Library · `Ctrl+3` Profile · `Ctrl+4` Messages
 
 ---
 
-## Download & Install
+## Getting Started
 
-Go to the [**Releases**](../../releases/latest) page and download the latest `FFXI-Addon-HUB-Setup-x.x.x.exe`.
+### 1 — Set your Windower path
 
-Run the installer — it will create a Start Menu shortcut and desktop icon. The app checks for updates automatically on launch.
+Go to **⚙ Settings** and click **Browse for Folder** to select your Windower 4 installation directory — the folder that contains the `addons` subfolder (e.g. `C:\Windower`).
 
----
+### 2 — Browse and install
 
-## Getting Started (End Users)
+Use the **Browse** view to search, sort, and install addons. Click any card to see the full description, star rating, and community reviews, then hit **Install**.
 
-1. **Sign Up / Sign In** — Click *Sign In* in the sidebar to create a free account
-2. **Set your Windower path** — Go to ⚙ Settings and click *Browse for Folder* to select your Windower 4 installation directory (the folder that contains the `addons` subfolder)
-3. **Browse addons** — Use the Browse view to search, sort, and install addons
-4. **View your library** — Switch to *My Library* to see everything currently installed
+### 3 — Create an account (optional)
+
+Click **Sign In** in the sidebar to register a free account. An account lets you:
+- Install and track addons
+- Leave ratings and reviews
+- Set up a profile with an avatar and bio
+- Send direct messages to other users
+- Submit new addons to the community
 
 ---
 
 ## Feature Guide
 
-### Browsing & Installing
+### Installing Addons
 
 - Search by name, author, or keyword
 - Sort by Default, Name A–Z, Name Z–A, or By Author
-- Click any card to open the addon detail panel with full description, star ratings, and all reviews
-- Click **Install** to download and extract to your Windower `addons` folder
-- Click **Uninstall** from the detail panel to remove it (a confirmation dialog will appear)
+- Click **Install** on any card, or open the detail panel for the full description and reviews first
+- Click **Uninstall** from the detail panel to remove an addon (a confirmation prompt appears)
 
 ### Reviews & Ratings
 
 - Open any addon's detail panel and switch to the **Reviews** tab
-- Select a star rating and write an optional review, then click **Submit Review**
-- Average ratings appear on every addon card in the grid
+- Pick a star rating, write an optional review, and click **Submit Review**
+- Average ratings are shown on every card in the grid
 
 ### Profile
 
-- Go to ◎ Profile to set your display name, avatar, and bio
-- Click your avatar (or the *Choose File* button) to upload a profile picture
-- **Private Notes** are visible only to you — useful for tracking addon configs or keybinds
-- Your profile is visible to other users when they read your reviews
+- Go to **◎ Profile** to set your display name, upload an avatar, and write a bio
+- **Private Notes** are only visible to you — useful for tracking addon configs or keybinds
+- Your profile is visible to other users when they view your reviews
 
 ### Direct Messages
 
-- Click ✉ Messages in the sidebar to open your inbox
-- Click **+ New** to search for a user by username and start a conversation
-- Press **Enter** to send · **Shift+Enter** for a new line
-- Unread message count appears as a badge on the Messages nav item
-- You can also click **✉ DM** on any review card to message that reviewer directly
+- Click **✉ Messages** in the sidebar
+- Click **+ New** to find a user by username and start a conversation
+- Press **Enter** to send, **Shift+Enter** for a new line
+- An unread badge on the Messages nav item updates in the background
+- Click **✉ DM** on any review card to message that reviewer directly
 
 ### Submitting Addons
 
-Any logged-in user can submit an addon:
-
-1. Click **+ Submit Addon** in the Browse header
-2. Paste a GitHub repo URL — the form auto-fills name, author, description, and download URL using the GitHub API
-3. Verify the **Folder Name** matches what Windower expects (usually the repo name)
-4. Click **Submit Addon**
-
-### Importing from GitHub (Admin)
-
-The Settings view has an **Import from GitHub** tool that:
-
-- Fetches all repositories tagged `windower-addon` on GitHub (the same source as windower-addons.com)
-- Compares against your existing database and marks already-imported addons
-- Lets you select/deselect and bulk-import in one operation
+1. Click **+ Submit Addon** in the Browse header (requires sign-in)
+2. Paste a GitHub repo URL — name, author, description, and download URL are auto-filled via the GitHub API
+3. Confirm the **Folder Name** matches what Windower expects (usually the repo name)
+4. Click **Submit Addon** — it appears in Browse immediately
 
 ---
 
-## For Developers
+## For Developers / Contributors
+
+> **This section is only for developers who want to run the code locally or contribute.** Regular users just download the installer from the Releases page — there is nothing to configure.
 
 ### Prerequisites
 
 - [Node.js](https://nodejs.org/) 18+
-- A [Supabase](https://supabase.com) project (free tier works)
 
-### Setup
+### Local Setup
 
 ```bash
 git clone https://github.com/Garyfromwork/FFXI-Addon-HUB.git
@@ -112,7 +114,7 @@ module.exports = {
 };
 ```
 
-Then start the app:
+Contact the project owner for the config values if you are contributing to the official instance.
 
 ```bash
 npm start
@@ -128,22 +130,23 @@ The installer is created in the `dist/` folder.
 
 ### Publishing a Release
 
-Requires a GitHub Classic Personal Access Token with the `repo` scope set as `GH_TOKEN`:
+Requires a GitHub Classic Personal Access Token (`repo` scope) set as `GH_TOKEN`:
 
 ```powershell
 $env:GH_TOKEN="ghp_yourtoken"
 npm run release
 ```
 
-This builds the installer, creates a GitHub Release, and uploads all files including the `latest.yml` update manifest. Users already running the app will be notified of the update on next launch.
+Bump `version` in `package.json` before each release. Users already running the app will be notified automatically.
 
 ---
 
-## Supabase Setup
+## Self-Hosting
 
-### Database Tables
+If you want to fork this project and run your own independent community hub, you will need your own Supabase project. Run the SQL below in the Supabase SQL Editor, then create `config.js` with your own credentials and build the installer.
 
-Run the following in your Supabase SQL Editor:
+<details>
+<summary>Database setup SQL</summary>
 
 ```sql
 -- Addons
@@ -196,29 +199,26 @@ create table public.messages (
   created_at timestamptz default now() not null
 );
 alter table public.messages enable row level security;
-create policy "Users can read their own messages" on public.messages for select to authenticated using (auth.uid() = sender_id or auth.uid() = receiver_id);
-create policy "Users can send messages" on public.messages for insert to authenticated with check (auth.uid() = sender_id);
-create policy "Receivers can mark messages read" on public.messages for update to authenticated using (auth.uid() = receiver_id);
+create policy "Users can read their own messages" on public.messages for select to authenticated
+  using (auth.uid() = sender_id or auth.uid() = receiver_id);
+create policy "Users can send messages" on public.messages for insert to authenticated
+  with check (auth.uid() = sender_id);
+create policy "Receivers can mark messages read" on public.messages for update to authenticated
+  using (auth.uid() = receiver_id);
 ```
 
-### Storage (for Avatar Uploads)
-
-1. In Supabase dashboard go to **Storage** and create a bucket named `avatars` — set it to **Public**
-2. Add these policies in the SQL Editor:
+Create an `avatars` storage bucket set to **Public**, then:
 
 ```sql
-create policy "Authenticated users can upload their own avatar"
-on storage.objects for insert to authenticated
-with check (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
-
-create policy "Authenticated users can update their own avatar"
-on storage.objects for update to authenticated
-using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
-
-create policy "Anyone can view avatars"
-on storage.objects for select to public
-using (bucket_id = 'avatars');
+create policy "Users can upload own avatar" on storage.objects for insert to authenticated
+  with check (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+create policy "Users can update own avatar" on storage.objects for update to authenticated
+  using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+create policy "Anyone can view avatars" on storage.objects for select to public
+  using (bucket_id = 'avatars');
 ```
+
+</details>
 
 ---
 
