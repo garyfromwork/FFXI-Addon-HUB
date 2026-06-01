@@ -258,21 +258,38 @@ app.on('window-all-closed', () => {
 // FILE SYSTEM & ADDON HANDLERS
 // ==========================================
 
-// Select Folder with validation
+// Select Folder with validation and write-permission check
 ipcMain.handle('select-folder', async () => {
   const result = await dialog.showOpenDialog({
-    properties: ['openDirectory']
+    properties: ['openDirectory'],
+    title: 'Select your Windower folder',
+    buttonLabel: 'Select Windower Folder',
   });
-  
+
   if (result.canceled) return null;
-  
+
   const folderPath = result.filePaths[0];
-  
-  // Validation check
-  if (!fs.existsSync(path.join(folderPath, 'addons'))) {
-    return { error: 'Invalid directory. Could not find the "addons" folder inside this path.' };
+  const addonsDir  = path.join(folderPath, 'addons');
+
+  if (!fs.existsSync(addonsDir)) {
+    return { error: 'This doesn\'t look like a Windower folder — no "addons" subfolder was found. Select the root Windower directory (e.g. C:\\Windower).' };
   }
-  
+
+  // Test write access before accepting the path — avoids silent failures or UAC prompts later
+  try {
+    const testFile = path.join(addonsDir, '.write-test');
+    fs.writeFileSync(testFile, '');
+    fs.unlinkSync(testFile);
+  } catch {
+    return {
+      error:
+        'The app doesn\'t have write permission to that folder.\n\n' +
+        'This usually means Windower is installed in a protected location like Program Files. ' +
+        'Move your Windower installation to a user-accessible folder such as C:\\Windower or ' +
+        'C:\\Games\\Windower and try again.'
+    };
+  }
+
   return { path: folderPath };
 });
 
@@ -308,7 +325,13 @@ ipcMain.handle('install-addon', async (event, { downloadUrl, windowerPath, addon
     return { success: true };
   } catch (error) {
     console.error("Installation failed:", error);
-    return { success: false, error: error.message };
+    const isPermission = error.code === 'EACCES' || error.code === 'EPERM';
+    return {
+      success: false,
+      error: isPermission
+        ? 'Permission denied. Your Windower folder may be in a protected location (e.g. Program Files). Move it to C:\\Windower and update your path in Settings.'
+        : error.message
+    };
   }
 });
 
