@@ -1,9 +1,9 @@
 {
-  "name": "ffxi-addon-manager",
-  "version": "1.0.0",
+  "name": "ffxi-addon-hub",
+  "version": "1.0.2",
   "description": "FFXI Windower Addon Manager",
   "main": "main.js",
-  "author": "Your Name",
+  "author": "Garyfromwork",
   "license": "ISC",
   "type": "commonjs",
   "scripts": {
@@ -13,7 +13,7 @@
   },
   "build": {
     "appId": "com.ffxi.addon-manager",
-    "productName": "FFXI Addon Manager",
+    "productName": "FFXI Addon HUB",
     "copyright": "Copyright © 2026",
     "files": [
       "main.js",
@@ -24,8 +24,8 @@
     ],
     "publish": {
       "provider": "github",
-      "owner": "YOUR_GITHUB_USERNAME",
-      "repo": "YOUR_REPO_NAME"
+      "owner": "Garyfromwork",
+      "repo": "FFXI-Addon-HUB"
     },
     "win": {
       "target": [
@@ -43,7 +43,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "FFXI Addon Manager"
+      "shortcutName": "FFXI Addon HUB"
     }
   },
   "devDependencies": {
