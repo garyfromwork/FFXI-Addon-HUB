@@ -1,0 +1,59 @@
+{
+  "name": "ffxi-addon-manager",
+  "version": "1.0.0",
+  "description": "FFXI Windower Addon Manager",
+  "main": "main.js",
+  "author": "Your Name",
+  "license": "ISC",
+  "type": "commonjs",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --publish=never",
+    "release": "electron-builder --publish=always"
+  },
+  "build": {
+    "appId": "com.ffxi.addon-manager",
+    "productName": "FFXI Addon Manager",
+    "copyright": "Copyright © 2026",
+    "files": [
+      "main.js",
+      "preload.js",
+      "index.html",
+      "config.js",
+      "node_modules/**/*"
+    ],
+    "publish": {
+      "provider": "github",
+      "owner": "YOUR_GITHUB_USERNAME",
+      "repo": "YOUR_REPO_NAME"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "FFXI Addon Manager"
+    }
+  },
+  "devDependencies": {
+    "electron": "^42.3.0",
+    "electron-builder": "^24.13.3"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.106.2",
+    "adm-zip": "^0.5.17",
+    "dotenv": "^17.4.2",
+    "electron-updater": "^6.8.3"
+  }
+}

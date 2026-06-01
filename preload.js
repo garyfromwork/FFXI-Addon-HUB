@@ -1,0 +1,26 @@
+const { contextBridge, ipcRenderer } = require('electron');
+
+contextBridge.exposeInMainWorld('electronAPI', {
+  selectFolder:    ()     => ipcRenderer.invoke('select-folder'),
+  installAddon:    (data) => ipcRenderer.invoke('install-addon', data),
+  checkAddon:      (data) => ipcRenderer.invoke('check-addon', data),
+  uninstallAddon:  (data) => ipcRenderer.invoke('uninstall-addon', data),
+  loginUser:       (data) => ipcRenderer.invoke('login-user', data),
+  registerUser:    (data) => ipcRenderer.invoke('register-user', data),
+  logoutUser:      ()     => ipcRenderer.invoke('logout-user'),
+  getAddons:       ()     => ipcRenderer.invoke('get-addons'),
+  submitReview:    (data) => ipcRenderer.invoke('submit-review', data),
+  getReviews:      (addonId) => ipcRenderer.invoke('get-reviews', addonId),
+  getProfile:      (userId) => ipcRenderer.invoke('get-profile', userId),
+  updateProfile:   (data) => ipcRenderer.invoke('update-profile', data),
+  uploadAvatar:      (userId) => ipcRenderer.invoke('upload-avatar', userId),
+  getConversations:  (userId) => ipcRenderer.invoke('get-conversations', userId),
+  getMessages:       (data)   => ipcRenderer.invoke('get-messages', data),
+  sendMessage:       (data)   => ipcRenderer.invoke('send-message', data),
+  searchUsers:       (data)   => ipcRenderer.invoke('search-users', data),
+  markRead:          (data)   => ipcRenderer.invoke('mark-read', data),
+  getSession:        ()       => ipcRenderer.invoke('get-session'),
+  getReviewCount:    (userId) => ipcRenderer.invoke('get-review-count', userId),
+  submitAddon:       (data)   => ipcRenderer.invoke('submit-addon', data),
+  bulkSubmitAddons:  (list)   => ipcRenderer.invoke('bulk-submit-addons', list),
+});

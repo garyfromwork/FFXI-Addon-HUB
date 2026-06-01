@@ -1,0 +1,2012 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>FFXI Addon Manager</title>
+  <style>
+    :root {
+      --bg-base:     #0e0e18;
+      --bg-sidebar:  #13131f;
+      --bg-card:     #1c1c2e;
+      --bg-elevated: #242438;
+      --bg-input:    #0a0a14;
+      --accent:      #c9a227;
+      --accent-h:    #e8bb30;
+      --accent-dim:  rgba(201,162,39,.13);
+      --purple:      #7c5cbf;
+      --green:       #3cb371;
+      --red:         #e05252;
+      --text:        #e4e4f0;
+      --text-sub:    #8888aa;
+      --text-muted:  #44445a;
+      --border:      #252540;
+      --r:           8px;
+      --r-lg:        12px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; background: var(--bg-base); color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; overflow: hidden; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    /* ── Titlebar ── */
+    .titlebar {
+      height: 32px; background: #090910;
+      display: flex; align-items: center; padding: 0 14px;
+      font-size: 11px; font-weight: 700; letter-spacing: 2px;
+      color: var(--accent); text-transform: uppercase;
+      -webkit-app-region: drag;
+      position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+      border-bottom: 1px solid var(--border);
+      gap: 8px;
+    }
+    .titlebar-glyph { font-size: 14px; -webkit-app-region: no-drag; }
+
+    /* ── Layout ── */
+    .app { display: flex; height: calc(100vh - 32px); margin-top: 32px; }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      width: 214px; min-width: 214px;
+      background: var(--bg-sidebar);
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+    }
+    .sidebar-brand {
+      display: flex; align-items: center; gap: 10px;
+      padding: 16px 14px; border-bottom: 1px solid var(--border);
+    }
+    .brand-glyph { font-size: 20px; color: var(--accent); }
+    .brand-name { font-size: 10px; font-weight: 700; color: var(--accent);
+      letter-spacing: .6px; line-height: 1.4; text-transform: uppercase; }
+
+    .sidebar-nav { flex: 1; display: flex; flex-direction: column; gap: 2px; padding: 10px 8px; }
+    .nav-btn {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 12px; border-radius: var(--r);
+      border: none; background: transparent; color: var(--text-sub);
+      font-size: 13px; font-weight: 500; cursor: pointer;
+      text-align: left; width: 100%;
+      transition: background .12s, color .12s;
+      -webkit-app-region: no-drag;
+    }
+    .nav-btn:hover { background: var(--accent-dim); color: var(--text); }
+    .nav-btn.active { background: var(--accent-dim); color: var(--accent); font-weight: 600; }
+    .nav-icon { font-size: 15px; width: 20px; text-align: center; flex-shrink: 0; }
+
+    .sidebar-footer { padding: 10px 8px; border-top: 1px solid var(--border); }
+    .sidebar-user {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px; border-radius: var(--r); cursor: default;
+    }
+    .sb-avatar {
+      width: 34px; height: 34px; border-radius: 50%;
+      background: var(--purple); flex-shrink: 0;
+      background-size: cover; background-position: center;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 13px; color: #fff;
+    }
+    .sb-info { min-width: 0; flex: 1; }
+    .sb-name { font-weight: 600; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sb-signout { font-size: 11px; color: var(--text-muted); cursor: pointer; }
+    .sb-signout:hover { color: var(--red); }
+
+    /* ── Main ── */
+    .main { flex: 1; overflow: hidden; position: relative; }
+    .view { position: absolute; inset: 0; overflow-y: auto; padding: 28px 32px; display: none; }
+    .view.active { display: block; }
+
+    /* ── View Header ── */
+    .vh { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 22px; gap: 16px; }
+    .vh-title { font-size: 22px; font-weight: 700; letter-spacing: -.3px; }
+    .vh-sub { font-size: 13px; color: var(--text-sub); margin-top: 3px; }
+
+    /* ── Search ── */
+    .search-row { display: flex; gap: 10px; margin-bottom: 12px; }
+    .search-input {
+      flex: 1; background: var(--bg-elevated); border: 1px solid var(--border);
+      color: var(--text); padding: 9px 14px; border-radius: var(--r);
+      font-size: 13px; font-family: inherit; outline: none; transition: border-color .12s;
+    }
+    .search-input:focus { border-color: var(--accent); }
+    .search-input::placeholder { color: var(--text-muted); }
+
+    /* ── Path Bar ── */
+    .path-bar {
+      display: flex; align-items: center; gap: 8px;
+      background: var(--bg-elevated); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 8px 12px;
+      font-size: 12px; margin-bottom: 20px;
+    }
+    .path-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--text-muted); flex-shrink: 0; }
+    .path-dot.ok { background: var(--green); }
+    .path-text { color: var(--text-sub); font-family: monospace; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .path-text.unset { font-family: inherit; font-style: italic; color: var(--text-muted); }
+    .path-action { font-size: 11px; color: var(--accent); cursor: pointer; background: none; border: none; font-family: inherit; flex-shrink: 0; -webkit-app-region: no-drag; }
+    .path-action:hover { text-decoration: underline; }
+
+    /* ── Addon Grid ── */
+    .addon-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); gap: 14px; }
+
+    /* ── Addon Card ── */
+    .addon-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--r-lg); overflow: hidden;
+      display: flex; flex-direction: column;
+      cursor: pointer; transition: border-color .14s, transform .14s, box-shadow .14s;
+    }
+    .addon-card:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 6px 24px rgba(0,0,0,.4); }
+    .card-banner {
+      height: 72px;
+      display: flex; align-items: center; justify-content: center;
+      position: relative; overflow: hidden;
+    }
+    .card-banner-glyph { font-size: 28px; opacity: .35; position: relative; z-index: 1; }
+    .card-banner::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to bottom, transparent 30%, var(--bg-card)); }
+    .card-body { padding: 12px 14px; flex: 1; display: flex; flex-direction: column; gap: 4px; }
+    .card-name { font-size: 14px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .card-author { font-size: 11px; color: var(--text-sub); }
+    .card-desc { font-size: 12px; color: var(--text-sub); line-height: 1.5; flex: 1;
+      display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-top: 2px; }
+    .card-footer {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 14px 12px; gap: 6px;
+    }
+    .card-footer-left { display: flex; align-items: center; gap: 6px; }
+    .card-actions { display: flex; gap: 6px; }
+
+    /* ── Badges ── */
+    .badge-installed {
+      display: inline-flex; align-items: center; gap: 3px;
+      font-size: 10px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .6px; color: var(--green);
+      background: rgba(60,179,113,.1); border: 1px solid rgba(60,179,113,.25);
+      padding: 2px 7px; border-radius: 20px;
+    }
+
+    /* ── Buttons ── */
+    button { -webkit-app-region: no-drag; }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+      padding: 8px 16px; border-radius: var(--r); border: none;
+      font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit;
+      transition: background .12s, opacity .12s; white-space: nowrap;
+    }
+    .btn:disabled { opacity: .45; cursor: not-allowed; }
+    .btn-primary  { background: var(--accent); color: #0e0e18; }
+    .btn-primary:hover:not(:disabled)  { background: var(--accent-h); }
+    .btn-ghost    { background: var(--bg-elevated); color: var(--text); }
+    .btn-ghost:hover:not(:disabled)    { background: var(--border); }
+    .btn-outline  { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+    .btn-outline:hover:not(:disabled)  { background: var(--accent-dim); }
+    .btn-danger   { background: var(--red); color: #fff; }
+    .btn-danger:hover:not(:disabled)   { background: #c04040; }
+    .btn-success  { background: var(--green); color: #fff; }
+    .btn-success:hover:not(:disabled)  { background: #2ea860; }
+    .btn-sm  { padding: 5px 11px; font-size: 12px; }
+    .btn-full { width: 100%; }
+
+    /* ── Modal Overlay ── */
+    .overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.72); backdrop-filter: blur(4px);
+      z-index: 500; display: flex; align-items: center; justify-content: center; padding: 20px;
+    }
+    .overlay.hidden { display: none; }
+    .modal {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--r-lg); overflow: hidden; position: relative;
+    }
+    .modal-x {
+      position: absolute; top: 10px; right: 10px;
+      background: transparent; border: none; color: var(--text-sub);
+      font-size: 18px; cursor: pointer; width: 30px; height: 30px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 5px; z-index: 10;
+    }
+    .modal-x:hover { background: var(--bg-elevated); color: var(--text); }
+
+    /* Auth Modal */
+    .auth-modal { width: 400px; max-width: 95vw; padding: 32px; }
+    .auth-brand { font-size: 20px; font-weight: 700; color: var(--accent); margin-bottom: 4px; }
+    .auth-sub { font-size: 13px; color: var(--text-sub); margin-bottom: 20px; }
+    .tab-row { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+    .tab-btn {
+      padding: 8px 16px; border: none; background: transparent; color: var(--text-sub);
+      font-size: 13px; font-weight: 500; cursor: pointer; font-family: inherit;
+      border-bottom: 2px solid transparent; margin-bottom: -1px;
+    }
+    .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+
+    /* Addon Detail Modal */
+    .detail-modal { width: 800px; max-width: 95vw; max-height: 88vh; display: flex; flex-direction: column; }
+    .detail-head { padding: 22px 26px 18px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+    .detail-title-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+    .detail-name { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+    .detail-meta { font-size: 12px; color: var(--text-sub); }
+    .detail-actions { display: flex; gap: 8px; flex-shrink: 0; align-items: center; }
+    .detail-body { flex: 1; overflow-y: auto; }
+    .modal-tabs { display: flex; padding: 0 26px; border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; background: var(--bg-card); z-index: 5; }
+    .mtab {
+      padding: 11px 14px; border: none; background: transparent; color: var(--text-sub);
+      font-size: 13px; font-weight: 500; cursor: pointer; font-family: inherit;
+      border-bottom: 2px solid transparent; margin-bottom: -1px; transition: color .12s;
+    }
+    .mtab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+    .tab-panel { display: none; padding: 22px 26px; }
+    .tab-panel.active { display: block; }
+
+    /* ── Forms ── */
+    .fg { margin-bottom: 14px; }
+    .fl { display: block; font-size: 10px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .8px; color: var(--text-sub); margin-bottom: 5px; }
+    .fi, .ft, .fs {
+      width: 100%; background: var(--bg-input); border: 1px solid var(--border);
+      color: var(--text); padding: 9px 12px; border-radius: var(--r);
+      font-size: 13px; font-family: inherit; outline: none; transition: border-color .12s;
+    }
+    .fi:focus, .ft:focus, .fs:focus { border-color: var(--accent); }
+    .fi::placeholder, .ft::placeholder { color: var(--text-muted); }
+    .ft { resize: vertical; min-height: 80px; line-height: 1.5; }
+    .fs { cursor: pointer; }
+    .fstatus { font-size: 12px; margin-top: 6px; min-height: 15px; }
+    .fstatus.ok { color: var(--green); }
+    .fstatus.err { color: var(--red); }
+
+    /* ── Profile View ── */
+    .profile-hero {
+      display: flex; align-items: flex-end; gap: 20px;
+      padding-bottom: 22px; margin-bottom: 24px; border-bottom: 1px solid var(--border);
+    }
+    .profile-avatar-wrap { position: relative; flex-shrink: 0; }
+    .profile-avatar {
+      width: 88px; height: 88px; border-radius: 50%;
+      background: var(--purple); border: 3px solid var(--accent);
+      background-size: cover; background-position: center;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 30px; font-weight: 700; color: #fff;
+      cursor: pointer; position: relative; overflow: hidden;
+    }
+    .avatar-hover {
+      position: absolute; inset: 0; background: rgba(0,0,0,.6);
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      opacity: 0; transition: opacity .14s;
+      font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: #fff; gap: 2px;
+    }
+    .avatar-hover-icon { font-size: 16px; }
+    .profile-avatar:hover .avatar-hover { opacity: 1; }
+    .profile-name { font-size: 24px; font-weight: 700; letter-spacing: -.4px; }
+    .profile-email { font-size: 12px; color: var(--text-sub); margin-top: 3px; }
+
+    .profile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .psec {
+      background: var(--bg-elevated); border: 1px solid var(--border);
+      border-radius: var(--r-lg); padding: 18px;
+    }
+    .psec.wide { grid-column: 1 / -1; }
+    .psec-title { font-size: 10px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .8px; color: var(--text-sub); margin-bottom: 14px; }
+
+    /* ── Reviews ── */
+    .reviews-list { display: flex; flex-direction: column; gap: 14px; }
+    .review-card { background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--r); padding: 13px 15px; }
+    .review-head { display: flex; align-items: center; gap: 10px; margin-bottom: 7px; }
+    .review-av {
+      width: 30px; height: 30px; border-radius: 50%; background: var(--purple);
+      flex-shrink: 0; background-size: cover; background-position: center;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 700; color: #fff;
+    }
+    .review-user { font-weight: 600; font-size: 13px; }
+    .review-stars { color: var(--accent); font-size: 12px; margin-left: auto; }
+    .review-text { font-size: 13px; color: var(--text-sub); line-height: 1.5; }
+
+    .write-review { background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--r); padding: 15px; margin-bottom: 18px; }
+    .wr-title { font-size: 13px; font-weight: 600; margin-bottom: 10px; }
+    .star-picker { display: flex; gap: 3px; margin-bottom: 10px; }
+    .star-pick {
+      background: none; border: none; font-size: 22px; cursor: pointer;
+      color: var(--text-muted); padding: 0; line-height: 1; transition: color .1s;
+    }
+    .star-pick.lit, .star-pick:hover { color: var(--accent); }
+
+    /* ── States ── */
+    .empty-state, .loading-state {
+      grid-column: 1 / -1; padding: 56px 20px; text-align: center;
+      color: var(--text-muted); font-size: 13px;
+    }
+    .empty-icon { font-size: 32px; margin-bottom: 10px; opacity: .35; }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed; bottom: 18px; right: 18px;
+      background: var(--bg-elevated); border: 1px solid var(--border);
+      border-left: 3px solid var(--green);
+      border-radius: var(--r); padding: 11px 15px; font-size: 13px;
+      z-index: 9999; max-width: 280px;
+      animation: toast-in .18s ease;
+    }
+    .toast.err { border-left-color: var(--red); }
+    @keyframes toast-in { from { transform: translateX(110%); opacity: 0; } to { transform: none; opacity: 1; } }
+
+    .hidden { display: none !important; }
+
+    /* ── View transition ── */
+    @keyframes view-in { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: none; } }
+    .view.active { animation: view-in .16s ease; }
+
+    /* ── Pulse loader ── */
+    @keyframes pulse { 0%,100% { opacity: .35; } 50% { opacity: 1; } }
+    .loading-state { animation: pulse 1.5s ease-in-out infinite; }
+
+    /* ── Message date separator ── */
+    .msg-date-sep { display: flex; align-items: center; gap: 10px; color: var(--text-muted); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .7px; margin: 8px 0 4px; }
+    .msg-date-sep::before, .msg-date-sep::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+    /* ── Grouped messages (consecutive same sender) ── */
+    .msg-wrap.grouped { margin-top: -6px; }
+    .msg-av.ghost { visibility: hidden; }
+
+    /* ── Messages ── */
+    .view-flush { padding: 0 !important; overflow: hidden !important; }
+    .messages-layout { display: flex; height: 100%; }
+
+    .conv-panel { width: 248px; min-width: 248px; border-right: 1px solid var(--border); display: flex; flex-direction: column; background: var(--bg-sidebar); }
+    .conv-head { padding: 12px 10px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .conv-head-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .7px; color: var(--text-sub); }
+    .conv-list { flex: 1; overflow-y: auto; }
+    .conv-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; cursor: pointer; border-bottom: 1px solid var(--border); transition: background .12s; }
+    .conv-item:hover { background: var(--bg-elevated); }
+    .conv-item.active { background: var(--accent-dim); }
+    .conv-av { width: 36px; height: 36px; border-radius: 50%; background: var(--purple); flex-shrink: 0; background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: #fff; }
+    .conv-info { flex: 1; min-width: 0; }
+    .conv-name-row { display: flex; align-items: center; justify-content: space-between; gap: 4px; }
+    .conv-name { font-size: 13px; font-weight: 600; }
+    .conv-preview { font-size: 11px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+    .conv-unread { background: var(--red); color: #fff; border-radius: 20px; padding: 1px 6px; font-size: 10px; font-weight: 700; flex-shrink: 0; }
+    .conv-empty { padding: 28px 14px; text-align: center; color: var(--text-muted); font-size: 12px; line-height: 1.6; }
+
+    .thread-panel { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    .thread-placeholder { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: var(--text-muted); font-size: 13px; }
+    .thread-placeholder-icon { font-size: 36px; opacity: .18; }
+    .thread-head { padding: 12px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+    .thread-head-name { font-weight: 600; font-size: 14px; }
+    .thread-msgs { flex: 1; overflow-y: auto; padding: 16px 20px; display: flex; flex-direction: column; gap: 14px; }
+    .thread-input-row { padding: 10px 14px; border-top: 1px solid var(--border); display: flex; gap: 8px; align-items: flex-end; flex-shrink: 0; }
+    .thread-input { flex: 1; background: var(--bg-elevated); border: 1px solid var(--border); color: var(--text); padding: 9px 12px; border-radius: var(--r); font-size: 13px; font-family: inherit; outline: none; resize: none; max-height: 120px; overflow-y: auto; transition: border-color .12s; line-height: 1.4; }
+    .thread-input:focus { border-color: var(--accent); }
+    .thread-input::placeholder { color: var(--text-muted); }
+
+    .msg-wrap { display: flex; gap: 8px; align-items: flex-end; }
+    .msg-wrap.mine { flex-direction: row-reverse; }
+    .msg-av { width: 28px; height: 28px; border-radius: 50%; background: var(--purple); flex-shrink: 0; background-size: cover; background-position: center; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: #fff; }
+    .msg-content { max-width: 68%; }
+    .msg-bubble { padding: 8px 12px; border-radius: 14px; font-size: 13px; line-height: 1.5; word-break: break-word; background: var(--bg-elevated); color: var(--text); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
+    .msg-wrap.mine .msg-bubble { background: var(--accent-dim); border-color: rgba(201,162,39,.3); border-bottom-left-radius: 14px; border-bottom-right-radius: 4px; }
+    .msg-time { font-size: 10px; color: var(--text-muted); margin-top: 3px; }
+    .msg-wrap.mine .msg-time { text-align: right; }
+
+    .search-panel { padding: 20px; max-width: 440px; }
+    .search-panel-title { font-size: 14px; font-weight: 700; margin-bottom: 14px; }
+    .user-result { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: var(--r); cursor: pointer; transition: background .12s; }
+    .user-result:hover { background: var(--bg-elevated); }
+    .user-result-name { font-size: 13px; font-weight: 500; }
+
+    .nav-badge { background: var(--red); color: #fff; border-radius: 20px; padding: 1px 6px; font-size: 10px; font-weight: 700; margin-left: auto; line-height: 1.5; }
+  </style>
+</head>
+<body>
+
+  <div class="titlebar">
+    <span class="titlebar-glyph">⚔</span>
+    FFXI Addon Manager
+  </div>
+
+  <div class="app">
+    <!-- ── Sidebar ── -->
+    <aside class="sidebar">
+      <div class="sidebar-brand">
+        <div class="brand-glyph">⚔</div>
+        <div class="brand-name">Vana'diel<br>Addon Hub</div>
+      </div>
+
+      <nav class="sidebar-nav">
+        <button class="nav-btn active" data-view="browse">
+          <span class="nav-icon">◈</span> Browse
+        </button>
+        <button class="nav-btn" data-view="library">
+          <span class="nav-icon">◉</span> My Library
+        </button>
+        <button class="nav-btn" data-view="profile">
+          <span class="nav-icon">◎</span> Profile
+        </button>
+        <button class="nav-btn" data-view="messages">
+          <span class="nav-icon">✉</span> Messages
+          <span class="nav-badge hidden" id="msg-badge">0</span>
+        </button>
+        <button class="nav-btn" data-view="settings">
+          <span class="nav-icon">⚙</span> Settings
+        </button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div id="sb-signin-wrap">
+          <button class="btn btn-primary btn-full" id="open-auth">Sign In</button>
+        </div>
+        <div id="sb-user" class="sidebar-user hidden">
+          <div class="sb-avatar" id="sb-avatar-el"></div>
+          <div class="sb-info">
+            <div class="sb-name" id="sb-name-el">User</div>
+            <div class="sb-signout" id="btn-signout">Sign Out</div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ── Main Content ── -->
+    <main class="main">
+
+      <!-- Browse View -->
+      <div id="view-browse" class="view active">
+        <div class="vh">
+          <div>
+            <div class="vh-title">Browse Addons</div>
+            <div class="vh-sub">Discover and install Windower addons for FFXI</div>
+          </div>
+          <button class="btn btn-outline hidden" id="btn-open-submit">+ Submit Addon</button>
+        </div>
+        <div class="search-row">
+          <input type="text" id="search-input" class="search-input" placeholder="Search by name, author, or keyword...">
+          <select id="sort-select" class="fs" style="width:150px;flex-shrink:0;">
+            <option value="default">Sort: Default</option>
+            <option value="name-asc">Name A–Z</option>
+            <option value="name-desc">Name Z–A</option>
+            <option value="author">By Author</option>
+          </select>
+        </div>
+        <div class="path-bar" id="path-bar">
+          <div class="path-dot" id="path-dot"></div>
+          <div class="path-text unset" id="path-text">No Windower path set</div>
+          <button class="path-action" id="btn-path">Set Path</button>
+        </div>
+        <div class="addon-grid" id="browse-grid">
+          <div class="loading-state">Loading addons…</div>
+        </div>
+      </div>
+
+      <!-- Library View -->
+      <div id="view-library" class="view">
+        <div class="vh">
+          <div>
+            <div class="vh-title">My Library</div>
+            <div class="vh-sub">Addons installed in your Windower directory</div>
+          </div>
+        </div>
+        <div class="addon-grid" id="library-grid">
+          <div class="empty-state"><div class="empty-icon">◉</div>Set your Windower path to see installed addons.</div>
+        </div>
+      </div>
+
+      <!-- Profile View -->
+      <div id="view-profile" class="view">
+        <!-- rendered dynamically -->
+      </div>
+
+      <!-- Settings View -->
+      <div id="view-settings" class="view">
+        <div class="vh">
+          <div>
+            <div class="vh-title">Settings</div>
+            <div class="vh-sub">Configure your Windower installation and preferences</div>
+          </div>
+        </div>
+
+        <div class="profile-grid">
+          <div class="psec wide">
+            <div class="psec-title">Windower Path</div>
+            <p style="font-size:13px;color:var(--text-sub);margin-bottom:14px;line-height:1.6;">
+              The root folder where Windower 4 is installed. Must contain an <code style="background:var(--bg-input);padding:1px 5px;border-radius:4px;font-size:12px;">addons</code> subfolder.
+            </p>
+            <div class="path-bar" id="settings-path-bar">
+              <div class="path-dot" id="settings-path-dot"></div>
+              <div class="path-text unset" id="settings-path-text">No path configured</div>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:12px;">
+              <button class="btn btn-primary" id="btn-settings-browse">Browse for Folder…</button>
+              <button class="btn btn-danger" id="btn-settings-clear">Clear Path</button>
+            </div>
+          </div>
+
+          <div class="psec">
+            <div class="psec-title">About</div>
+            <div style="font-size:13px;color:var(--text-sub);line-height:2;">
+              <div><strong style="color:var(--text);">FFXI Addon Manager</strong></div>
+              <div>Vana'diel Addon Hub &nbsp;·&nbsp; v1.0.0</div>
+              <div>Electron + Supabase</div>
+            </div>
+          </div>
+
+          <div class="psec wide">
+            <div class="psec-title">Import from GitHub</div>
+            <p style="font-size:13px;color:var(--text-sub);margin-bottom:14px;line-height:1.6;">
+              Fetches all repositories tagged <code style="background:var(--bg-input);padding:1px 5px;border-radius:4px;font-size:12px;">windower-addon</code> on GitHub —
+              the same source used by windower-addons.com — and lets you bulk-import them into your database.
+              Already-imported addons are detected and skipped automatically.
+            </p>
+            <button class="btn btn-primary" id="btn-open-importer">Fetch Addons from GitHub…</button>
+          </div>
+
+          <div class="psec">
+            <div class="psec-title">Supabase Setup Checklist</div>
+            <div style="font-size:12px;color:var(--text-sub);line-height:2.2;">
+              <div>✦ &nbsp;<code style="font-size:11px;background:var(--bg-input);padding:1px 5px;border-radius:3px;">profiles</code> — needs INSERT + UPDATE policies</div>
+              <div>✦ &nbsp;<code style="font-size:11px;background:var(--bg-input);padding:1px 5px;border-radius:3px;">messages</code> — needs SELECT + INSERT + UPDATE policies</div>
+              <div>✦ &nbsp;<code style="font-size:11px;background:var(--bg-input);padding:1px 5px;border-radius:3px;">avatars</code> — Storage bucket, public read + auth write</div>
+              <div>✦ &nbsp;<code style="font-size:11px;background:var(--bg-input);padding:1px 5px;border-radius:3px;">notes</code> column on profiles table</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Messages View -->
+      <div id="view-messages" class="view view-flush">
+        <div class="messages-layout">
+          <div class="conv-panel">
+            <div class="conv-head">
+              <div class="conv-head-title">Messages</div>
+              <button class="btn btn-primary btn-sm" id="btn-new-dm">+ New</button>
+            </div>
+            <div class="conv-list" id="conv-list">
+              <div class="conv-empty">No conversations yet.</div>
+            </div>
+          </div>
+          <div class="thread-panel" id="thread-panel">
+            <div class="thread-placeholder">
+              <div class="thread-placeholder-icon">✉</div>
+              <div>Select a conversation or start a new one</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+
+  <!-- ── Addon Detail Modal ── -->
+  <div id="detail-overlay" class="overlay hidden">
+    <div class="modal detail-modal">
+      <button class="modal-x" id="close-detail">✕</button>
+      <div class="detail-head">
+        <div class="detail-title-row">
+          <div>
+            <div class="detail-name" id="d-name"></div>
+            <div class="detail-meta">
+              by <span id="d-author"></span>
+              &nbsp;·&nbsp;
+              <span id="d-rating-display"></span>
+            </div>
+          </div>
+          <div class="detail-actions">
+            <span id="d-badge"></span>
+            <button class="btn btn-primary" id="d-install-btn">Install</button>
+            <button class="btn btn-danger btn-sm hidden" id="d-uninstall-btn">Uninstall</button>
+          </div>
+        </div>
+      </div>
+      <div class="detail-body">
+        <div class="modal-tabs">
+          <button class="mtab active" data-tab="overview">Overview</button>
+          <button class="mtab" data-tab="reviews">Reviews</button>
+        </div>
+        <div id="tab-overview" class="tab-panel active">
+          <p id="d-desc" style="color:var(--text-sub);line-height:1.75;"></p>
+        </div>
+        <div id="tab-reviews" class="tab-panel">
+          <div id="write-review-area"></div>
+          <div id="reviews-area"><div class="loading-state">Loading reviews…</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── GitHub Importer Modal ── -->
+  <div id="importer-overlay" class="overlay hidden">
+    <div class="modal" style="width:760px;max-width:96vw;max-height:90vh;display:flex;flex-direction:column;">
+      <button class="modal-x" id="close-importer">✕</button>
+      <div style="padding:24px 26px 16px;flex-shrink:0;border-bottom:1px solid var(--border);">
+        <div style="font-size:18px;font-weight:700;color:var(--accent);margin-bottom:4px;">Import from GitHub</div>
+        <div style="font-size:13px;color:var(--text-sub);" id="importer-subtitle">Fetching repositories tagged <code style="background:var(--bg-input);padding:1px 4px;border-radius:3px;">windower-addon</code> on GitHub…</div>
+      </div>
+      <div style="padding:10px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-shrink:0;" id="importer-toolbar" class="hidden">
+        <button class="btn btn-ghost btn-sm" id="btn-select-all">Select All</button>
+        <button class="btn btn-ghost btn-sm" id="btn-deselect-all">Deselect All</button>
+        <input type="text" id="importer-search" class="search-input" style="max-width:240px;padding:6px 10px;font-size:12px;" placeholder="Filter list…">
+        <span style="margin-left:auto;font-size:12px;color:var(--text-sub);" id="importer-count"></span>
+      </div>
+      <div style="flex:1;overflow-y:auto;" id="importer-list">
+        <div class="loading-state">Contacting GitHub API…</div>
+      </div>
+      <div style="padding:14px 20px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;" id="importer-footer" class="hidden">
+        <div style="font-size:12px;color:var(--text-sub);" id="importer-selection-label">0 selected</div>
+        <button class="btn btn-primary" id="btn-do-import" disabled>Import Selected</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Submit Addon Modal ── -->
+  <div id="submit-overlay" class="overlay hidden">
+    <div class="modal" style="width:560px;max-width:95vw;padding:28px;overflow-y:auto;max-height:90vh;">
+      <button class="modal-x" id="close-submit">✕</button>
+      <div style="font-size:18px;font-weight:700;margin-bottom:4px;color:var(--accent);">Submit an Addon</div>
+      <div style="font-size:13px;color:var(--text-sub);margin-bottom:22px;">Share a Windower addon with the FFXI community</div>
+
+      <div class="fg">
+        <label class="fl">GitHub Repository URL <span style="color:var(--text-muted);font-weight:400;text-transform:none;letter-spacing:0;">— paste to auto-fill fields below</span></label>
+        <input type="text" id="sub-github" class="fi" placeholder="https://github.com/author/addon-name">
+        <div class="fstatus" id="sub-github-status"></div>
+      </div>
+
+      <div style="height:1px;background:var(--border);margin:4px 0 18px;"></div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="fg">
+          <label class="fl">Addon Name <span style="color:var(--red);">*</span></label>
+          <input type="text" id="sub-name" class="fi" placeholder="GearSwap">
+        </div>
+        <div class="fg">
+          <label class="fl">Author <span style="color:var(--red);">*</span></label>
+          <input type="text" id="sub-author" class="fi" placeholder="Byrth">
+        </div>
+      </div>
+
+      <div class="fg">
+        <label class="fl">Description</label>
+        <textarea id="sub-desc" class="ft" style="min-height:72px;" placeholder="What does this addon do?"></textarea>
+      </div>
+
+      <div class="fg">
+        <label class="fl">Folder Name <span style="color:var(--red);">*</span> <span style="color:var(--text-muted);font-weight:400;text-transform:none;letter-spacing:0;">— must match what Windower expects</span></label>
+        <input type="text" id="sub-folder" class="fi" placeholder="GearSwap">
+      </div>
+
+      <div class="fg">
+        <label class="fl">Download URL <span style="color:var(--red);">*</span> <span style="color:var(--text-muted);font-weight:400;text-transform:none;letter-spacing:0;">— direct link to .zip file</span></label>
+        <input type="text" id="sub-url" class="fi" placeholder="https://github.com/author/repo/archive/refs/heads/master.zip">
+      </div>
+
+      <button class="btn btn-primary btn-full" id="btn-do-submit">Submit Addon</button>
+      <div class="fstatus" id="submit-status" style="margin-top:8px;text-align:center;"></div>
+    </div>
+  </div>
+
+  <!-- ── Auth Modal ── -->
+  <div id="auth-overlay" class="overlay hidden">
+    <div class="modal auth-modal">
+      <button class="modal-x" id="close-auth">✕</button>
+      <div class="auth-brand">⚔ Welcome</div>
+      <div class="auth-sub">Sign in to rate, review, and manage addons</div>
+      <div class="tab-row">
+        <button class="tab-btn active" data-auth="login">Sign In</button>
+        <button class="tab-btn" data-auth="register">Create Account</button>
+      </div>
+      <div class="fg">
+        <label class="fl">Email Address</label>
+        <input type="email" id="auth-email" class="fi" placeholder="you@example.com">
+      </div>
+      <div class="fg">
+        <label class="fl">Password</label>
+        <input type="password" id="auth-password" class="fi" placeholder="••••••••">
+      </div>
+      <button class="btn btn-primary btn-full" id="btn-auth-submit">Sign In</button>
+      <div class="fstatus" id="auth-status"></div>
+    </div>
+  </div>
+
+  <script>
+    // ────────────────────────────────────────────
+    // STATE
+    // ────────────────────────────────────────────
+    const S = {
+      user:    null,   // { id, email }
+      profile: null,   // { username, avatar_url, bio, notes }
+      path:    localStorage.getItem('windowerPath') || '',
+      addons:  [],
+      openAddon: null,
+      reviewRating: 5,
+    };
+
+    // ────────────────────────────────────────────
+    // UTILS
+    // ────────────────────────────────────────────
+    function esc(s) {
+      return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function stars(n, max = 5) {
+      let s = '';
+      for (let i = 1; i <= max; i++) s += i <= Math.round(n) ? '★' : '☆';
+      return s;
+    }
+
+    function toast(msg, isErr = false) {
+      const el = document.createElement('div');
+      el.className = `toast${isErr ? ' err' : ''}`;
+      el.textContent = msg;
+      document.body.appendChild(el);
+      setTimeout(() => el.remove(), 3400);
+    }
+
+    function setAvatar(el, url, fallback) {
+      if (url) {
+        el.style.backgroundImage = `url('${url}')`;
+        el.textContent = '';
+      } else {
+        el.style.backgroundImage = 'none';
+        el.textContent = (fallback || '?')[0].toUpperCase();
+      }
+    }
+
+    // ────────────────────────────────────────────
+    // NAVIGATION
+    // ────────────────────────────────────────────
+    function switchView(name) {
+      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+      document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById(`view-${name}`)?.classList.add('active');
+      document.querySelector(`[data-view="${name}"]`)?.classList.add('active');
+      if (name === 'profile')  renderProfileView();
+      if (name === 'library')  renderLibrary();
+      if (name === 'settings') updateSettingsPathBar();
+      if (name === 'messages') onMessagesView();
+      else stopMsgPoll();
+    }
+
+    document.querySelectorAll('.nav-btn').forEach(b => {
+      b.addEventListener('click', () => switchView(b.dataset.view));
+    });
+
+    // ────────────────────────────────────────────
+    // PATH
+    // ────────────────────────────────────────────
+    function updatePathBar() {
+      const dot  = document.getElementById('path-dot');
+      const text = document.getElementById('path-text');
+      const btn  = document.getElementById('btn-path');
+      if (S.path) {
+        dot.classList.add('ok');
+        text.className = 'path-text';
+        text.textContent = S.path;
+        btn.textContent = 'Change';
+      } else {
+        dot.classList.remove('ok');
+        text.className = 'path-text unset';
+        text.textContent = 'No Windower path set — click to select';
+        btn.textContent = 'Set Path';
+      }
+      updateSettingsPathBar();
+    }
+
+    function updateSettingsPathBar() {
+      const dot  = document.getElementById('settings-path-dot');
+      const text = document.getElementById('settings-path-text');
+      if (!dot) return;
+      if (S.path) {
+        dot.classList.add('ok');
+        text.className = 'path-text';
+        text.textContent = S.path;
+      } else {
+        dot.classList.remove('ok');
+        text.className = 'path-text unset';
+        text.textContent = 'No path configured';
+      }
+    }
+
+    document.getElementById('btn-settings-browse').addEventListener('click', selectPath);
+    document.getElementById('btn-settings-clear').addEventListener('click', () => {
+      S.path = '';
+      localStorage.removeItem('windowerPath');
+      updatePathBar();
+      loadAddons();
+      toast('Windower path cleared.');
+    });
+
+    async function selectPath() {
+      const res = await window.electronAPI.selectFolder();
+      if (!res) return;
+      if (res.error) { toast(res.error, true); return; }
+      S.path = res.path;
+      localStorage.setItem('windowerPath', S.path);
+      updatePathBar();
+      loadAddons();
+    }
+
+    document.getElementById('btn-path').addEventListener('click', selectPath);
+
+    // ────────────────────────────────────────────
+    // ADDON LOADING
+    // ────────────────────────────────────────────
+    async function loadAddons() {
+      const grid = document.getElementById('browse-grid');
+      grid.innerHTML = '<div class="loading-state">Fetching addons…</div>';
+      const res = await window.electronAPI.getAddons();
+      if (!res.success) {
+        grid.innerHTML = '<div class="empty-state"><div class="empty-icon">⚠</div>Failed to load. Check your connection.</div>';
+        return;
+      }
+      S.addons = res.data;
+      renderGrid(S.addons, grid);
+    }
+
+    function applySearch(q) {
+      if (!q.trim()) return S.addons;
+      const lc = q.toLowerCase();
+      return S.addons.filter(a =>
+        a.name.toLowerCase().includes(lc) ||
+        (a.author || '').toLowerCase().includes(lc) ||
+        (a.description || '').toLowerCase().includes(lc)
+      );
+    }
+
+    function sortAddons(addons) {
+      const sort = document.getElementById('sort-select')?.value || 'default';
+      const out = [...addons];
+      if (sort === 'name-asc')  out.sort((a, b) => a.name.localeCompare(b.name));
+      if (sort === 'name-desc') out.sort((a, b) => b.name.localeCompare(a.name));
+      if (sort === 'author')    out.sort((a, b) => (a.author || '').localeCompare(b.author || ''));
+      return out;
+    }
+
+    function refreshBrowse() {
+      const q = document.getElementById('search-input')?.value || '';
+      renderGrid(sortAddons(applySearch(q)), document.getElementById('browse-grid'));
+    }
+
+    document.getElementById('search-input').addEventListener('input', refreshBrowse);
+    document.getElementById('sort-select').addEventListener('change', refreshBrowse);
+
+    // ────────────────────────────────────────────
+    // RENDER GRID
+    // ────────────────────────────────────────────
+    const ICONS = ['⚔','◈','✦','◉','⚡','✧','◆','⊕','✱','❋'];
+    const PALETTES = [
+      'linear-gradient(135deg,#1a0a30,#0a1a35)',
+      'linear-gradient(135deg,#1a1a0a,#0a2010)',
+      'linear-gradient(135deg,#200a10,#0a1030)',
+      'linear-gradient(135deg,#0a1a20,#1a0a25)',
+      'linear-gradient(135deg,#151020,#0a1820)',
+    ];
+
+    async function renderGrid(addons, container, libraryOnly = false) {
+      container.innerHTML = '';
+      if (!addons?.length) {
+        container.innerHTML = `<div class="empty-state"><div class="empty-icon">◈</div>${libraryOnly ? 'No addons installed yet.' : 'No addons match your search.'}</div>`;
+        return;
+      }
+
+      // Build install-state map (parallel for speed)
+      const installed = {};
+      if (S.path) {
+        const checks = await Promise.all(
+          addons.map(a => window.electronAPI.checkAddon({ windowerPath: S.path, addonName: a.folder_name }))
+        );
+        addons.forEach((a, i) => { installed[a.id] = checks[i]; });
+      }
+
+      const visible = libraryOnly ? addons.filter(a => installed[a.id]) : addons;
+      if (!visible.length) {
+        container.innerHTML = '<div class="empty-state"><div class="empty-icon">◉</div>No addons installed yet. Browse to find some!</div>';
+        return;
+      }
+
+      for (const addon of visible) {
+        const isInst = !!installed[addon.id];
+        const card = buildCard(addon, isInst);
+        container.appendChild(card);
+      }
+    }
+
+    function buildCard(addon, isInst) {
+      const card = document.createElement('div');
+      card.className = 'addon-card';
+      const icon = ICONS[Math.abs(addon.name.charCodeAt(0)) % ICONS.length];
+      const palette = PALETTES[Math.abs((addon.name.charCodeAt(0) + addon.name.length)) % PALETTES.length];
+
+      const reviewCount = addon.reviews?.length || 0;
+      const avgRating   = reviewCount
+        ? addon.reviews.reduce((s, r) => s + r.rating, 0) / reviewCount
+        : 0;
+      const ratingHTML  = reviewCount
+        ? `<span style="color:var(--accent);font-size:11px;letter-spacing:.5px;">${stars(avgRating)}</span>
+           <span style="color:var(--text-muted);font-size:11px;">(${reviewCount})</span>`
+        : `<span style="color:var(--text-muted);font-size:11px;">No reviews</span>`;
+
+      card.innerHTML = `
+        <div class="card-banner" style="background:${palette}">
+          <span class="card-banner-glyph">${icon}</span>
+        </div>
+        <div class="card-body">
+          <div class="card-name">${esc(addon.name)}</div>
+          <div class="card-author">by ${esc(addon.author)}</div>
+          <div class="card-desc">${esc(addon.description || 'No description.')}</div>
+        </div>
+        <div class="card-footer">
+          <div class="card-footer-left" style="display:flex;flex-direction:column;gap:3px;">
+            <div style="display:flex;align-items:center;gap:4px;">${ratingHTML}</div>
+            ${isInst ? '<span class="badge-installed">✓ Installed</span>' : ''}
+          </div>
+          <div class="card-actions">
+            <button class="btn btn-ghost btn-sm js-details">Details</button>
+            ${S.path ? `<button class="btn ${isInst ? 'btn-success' : 'btn-primary'} btn-sm js-install">${isInst ? 'Update' : 'Install'}</button>` : ''}
+          </div>
+        </div>
+      `;
+
+      card.addEventListener('click', () => openDetail(addon, isInst));
+      card.querySelector('.js-details').addEventListener('click', e => { e.stopPropagation(); openDetail(addon, isInst); });
+
+      const installBtn = card.querySelector('.js-install');
+      if (installBtn) {
+        installBtn.addEventListener('click', async e => {
+          e.stopPropagation();
+          installBtn.disabled = true; installBtn.textContent = 'Installing…';
+          const res = await window.electronAPI.installAddon({ downloadUrl: addon.download_url, windowerPath: S.path, addonName: addon.folder_name });
+          if (res.success) { toast(`${addon.name} installed!`); loadAddons(); }
+          else { toast(`Install failed: ${res.error}`, true); installBtn.disabled = false; installBtn.textContent = 'Install'; }
+        });
+      }
+
+      return card;
+    }
+
+    // ────────────────────────────────────────────
+    // LIBRARY
+    // ────────────────────────────────────────────
+    async function renderLibrary() {
+      const grid = document.getElementById('library-grid');
+      if (!S.path) {
+        grid.innerHTML = '<div class="empty-state"><div class="empty-icon">◉</div>Set your Windower path first.</div>';
+        return;
+      }
+      grid.innerHTML = '<div class="loading-state">Checking installed addons…</div>';
+      await renderGrid(S.addons, grid, true);
+    }
+
+    // ────────────────────────────────────────────
+    // ADDON DETAIL MODAL
+    // ────────────────────────────────────────────
+    async function openDetail(addon, isInst) {
+      S.openAddon = addon;
+
+      document.getElementById('d-name').textContent = addon.name;
+      document.getElementById('d-author').textContent = addon.author;
+      document.getElementById('d-desc').textContent = addon.description || 'No description available.';
+      document.getElementById('d-rating-display').textContent = '★★★★★';
+      document.getElementById('d-badge').innerHTML = isInst ? '<span class="badge-installed">✓ Installed</span>' : '';
+
+      const instBtn = document.getElementById('d-install-btn');
+      const uninstBtn = document.getElementById('d-uninstall-btn');
+      instBtn.textContent = isInst ? 'Reinstall' : 'Install';
+      instBtn.disabled = !S.path;
+      instBtn.className = `btn ${isInst ? 'btn-success' : 'btn-primary'}`;
+      uninstBtn.classList.toggle('hidden', !isInst);
+
+      switchModalTab('overview');
+      document.getElementById('detail-overlay').classList.remove('hidden');
+      loadReviews(addon.id);
+    }
+
+    function switchModalTab(name) {
+      document.querySelectorAll('.mtab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === `tab-${name}`));
+    }
+    document.querySelectorAll('.mtab').forEach(t => t.addEventListener('click', () => switchModalTab(t.dataset.tab)));
+    document.getElementById('close-detail').addEventListener('click', () => document.getElementById('detail-overlay').classList.add('hidden'));
+
+    document.getElementById('d-install-btn').addEventListener('click', async () => {
+      if (!S.openAddon || !S.path) return;
+      const btn = document.getElementById('d-install-btn');
+      btn.disabled = true; btn.textContent = 'Installing…';
+      const res = await window.electronAPI.installAddon({ downloadUrl: S.openAddon.download_url, windowerPath: S.path, addonName: S.openAddon.folder_name });
+      if (res.success) { toast(`${S.openAddon.name} installed!`); document.getElementById('detail-overlay').classList.add('hidden'); loadAddons(); }
+      else { toast(`Install failed: ${res.error}`, true); btn.disabled = false; btn.textContent = 'Install'; }
+    });
+
+    document.getElementById('d-uninstall-btn').addEventListener('click', async () => {
+      if (!S.openAddon || !S.path) return;
+      if (!confirm(`Remove "${S.openAddon.name}"?\n\nThis will delete the addon folder from your Windower directory.`)) return;
+      const btn = document.getElementById('d-uninstall-btn');
+      btn.disabled = true; btn.textContent = 'Removing…';
+      const res = await window.electronAPI.uninstallAddon({ windowerPath: S.path, addonName: S.openAddon.folder_name });
+      if (res.success) { toast(`${S.openAddon.name} removed.`); document.getElementById('detail-overlay').classList.add('hidden'); loadAddons(); }
+      else { toast(`Uninstall failed: ${res.error}`, true); btn.disabled = false; btn.textContent = 'Uninstall'; }
+    });
+
+    // ────────────────────────────────────────────
+    // REVIEWS
+    // ────────────────────────────────────────────
+    async function loadReviews(addonId) {
+      const area = document.getElementById('reviews-area');
+      const wr   = document.getElementById('write-review-area');
+      area.innerHTML = '<div class="loading-state">Loading reviews…</div>';
+
+      wr.innerHTML = S.user
+        ? buildWriteReview()
+        : '<p style="color:var(--text-sub);font-size:13px;margin-bottom:16px;">Sign in to leave a review.</p>';
+
+      if (S.user) bindWriteReview(addonId);
+
+      const res = await window.electronAPI.getReviews(addonId);
+      if (!res.success || !res.data.length) {
+        area.innerHTML = '<div class="empty-state">No reviews yet — be the first!</div>';
+        return;
+      }
+
+      const avg = res.data.reduce((s, r) => s + r.rating, 0) / res.data.length;
+      document.getElementById('d-rating-display').textContent =
+        `${stars(avg)} ${avg.toFixed(1)} (${res.data.length})`;
+
+      area.innerHTML = `<div class="reviews-list">${res.data.map(buildReviewHTML).join('')}</div>`;
+    }
+
+    function buildReviewHTML(r) {
+      const name = r.profiles?.username || 'Anonymous';
+      const url  = r.profiles?.avatar_url || '';
+      const avatarStyle = url ? `style="background-image:url('${esc(url)}')"` : '';
+      const canDm = S.user && r.user_id !== S.user.id && r.profiles?.username;
+      return `
+        <div class="review-card">
+          <div class="review-head">
+            <div class="review-av" ${avatarStyle}>${url ? '' : esc(name[0].toUpperCase())}</div>
+            <div class="review-user">${esc(name)}</div>
+            <div style="display:flex;align-items:center;gap:8px;margin-left:auto;">
+              ${canDm ? `<button class="btn btn-ghost btn-sm" style="font-size:11px;padding:3px 8px;" data-dm-id="${esc(r.user_id)}" data-dm-name="${esc(name)}" data-dm-avatar="${esc(url)}">✉ DM</button>` : ''}
+              <div class="review-stars">${stars(r.rating)} ${r.rating}/5</div>
+            </div>
+          </div>
+          ${r.review_text ? `<div class="review-text">${esc(r.review_text)}</div>` : ''}
+        </div>
+      `;
+    }
+
+    // Event delegation for DM buttons inside reviews
+    document.getElementById('reviews-area').addEventListener('click', e => {
+      const btn = e.target.closest('[data-dm-id]');
+      if (!btn) return;
+      const { dmId, dmName, dmAvatar } = btn.dataset;
+      document.getElementById('detail-overlay').classList.add('hidden');
+      S.activePartner = { id: dmId, username: dmName, avatar_url: dmAvatar };
+      switchView('messages');
+    });
+
+    function buildWriteReview() {
+      const starBtns = [1,2,3,4,5].map(i =>
+        `<button class="star-pick${i <= S.reviewRating ? ' lit' : ''}" data-star="${i}">★</button>`
+      ).join('');
+      return `
+        <div class="write-review">
+          <div class="wr-title">Leave a Review</div>
+          <div class="star-picker" id="star-picker">${starBtns}</div>
+          <textarea id="review-text" class="ft" placeholder="Share your experience…" style="margin-bottom:10px;"></textarea>
+          <button class="btn btn-primary btn-sm" id="btn-submit-review">Submit Review</button>
+          <div class="fstatus" id="review-status"></div>
+        </div>
+      `;
+    }
+
+    function bindWriteReview(addonId) {
+      const picker = document.getElementById('star-picker');
+      if (!picker) return;
+
+      function renderPicker(val) {
+        document.querySelectorAll('.star-pick').forEach((b, i) => b.classList.toggle('lit', i < val));
+      }
+
+      picker.addEventListener('mouseover', e => {
+        if (e.target.dataset.star) renderPicker(parseInt(e.target.dataset.star));
+      });
+      picker.addEventListener('mouseleave', () => renderPicker(S.reviewRating));
+      picker.addEventListener('click', e => {
+        if (e.target.dataset.star) { S.reviewRating = parseInt(e.target.dataset.star); renderPicker(S.reviewRating); }
+      });
+
+      document.getElementById('btn-submit-review').addEventListener('click', async () => {
+        const text = document.getElementById('review-text').value.trim();
+        const statusEl = document.getElementById('review-status');
+        const btn = document.getElementById('btn-submit-review');
+        btn.disabled = true;
+        statusEl.textContent = 'Submitting…'; statusEl.className = 'fstatus';
+
+        const res = await window.electronAPI.submitReview({ addonId, userId: S.user.id, rating: S.reviewRating, reviewText: text });
+
+        if (res.success) {
+          statusEl.textContent = 'Review submitted!'; statusEl.className = 'fstatus ok';
+          document.getElementById('review-text').value = '';
+          setTimeout(() => loadReviews(addonId), 600);
+        } else {
+          statusEl.textContent = res.error || 'Submission failed.'; statusEl.className = 'fstatus err';
+          btn.disabled = false;
+        }
+      });
+    }
+
+    // ────────────────────────────────────────────
+    // AUTH MODAL
+    // ────────────────────────────────────────────
+    let authMode = 'login';
+
+    document.getElementById('open-auth').addEventListener('click', () => {
+      document.getElementById('auth-overlay').classList.remove('hidden');
+      setTimeout(() => document.getElementById('auth-email')?.focus(), 50);
+    });
+    document.getElementById('close-auth').addEventListener('click', () => {
+      document.getElementById('auth-overlay').classList.add('hidden');
+      document.getElementById('auth-status').textContent = '';
+    });
+
+    document.querySelectorAll('[data-auth]').forEach(tab => {
+      tab.addEventListener('click', () => {
+        authMode = tab.dataset.auth;
+        document.querySelectorAll('[data-auth]').forEach(t => t.classList.toggle('active', t.dataset.auth === authMode));
+        document.getElementById('btn-auth-submit').textContent = authMode === 'login' ? 'Sign In' : 'Create Account';
+        document.getElementById('auth-status').textContent = '';
+      });
+    });
+
+    document.getElementById('auth-password').addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById('btn-auth-submit').click();
+    });
+
+    document.getElementById('btn-auth-submit').addEventListener('click', async () => {
+      const email    = document.getElementById('auth-email').value.trim();
+      const password = document.getElementById('auth-password').value;
+      const statusEl = document.getElementById('auth-status');
+      const btn      = document.getElementById('btn-auth-submit');
+
+      if (!email || !password) {
+        statusEl.textContent = 'Please fill in all fields.'; statusEl.className = 'fstatus err'; return;
+      }
+
+      btn.disabled = true;
+      statusEl.textContent = 'Authenticating…'; statusEl.className = 'fstatus';
+
+      const res = authMode === 'login'
+        ? await window.electronAPI.loginUser({ email, password })
+        : await window.electronAPI.registerUser({ email, password });
+
+      if (res.success) {
+        await onLogin(res);
+        document.getElementById('auth-overlay').classList.add('hidden');
+        document.getElementById('auth-email').value = '';
+        document.getElementById('auth-password').value = '';
+        statusEl.textContent = '';
+      } else {
+        statusEl.textContent = res.error || 'Authentication failed.'; statusEl.className = 'fstatus err';
+      }
+      btn.disabled = false;
+    });
+
+    // ────────────────────────────────────────────
+    // AUTH STATE
+    // ────────────────────────────────────────────
+    async function onLogin(res, showWelcome = true) {
+      S.user = { id: res.id, email: res.email };
+      const profileRes = await window.electronAPI.getProfile(res.id);
+      S.profile = profileRes.success ? profileRes.data : {};
+
+      document.getElementById('sb-signin-wrap').classList.add('hidden');
+      document.getElementById('sb-user').classList.remove('hidden');
+
+      const displayName = S.profile?.username || res.email.split('@')[0];
+      document.getElementById('sb-name-el').textContent = displayName;
+      setAvatar(document.getElementById('sb-avatar-el'), S.profile?.avatar_url, displayName);
+
+      document.getElementById('btn-open-submit')?.classList.remove('hidden');
+      if (showWelcome) toast(`Welcome, ${displayName}!`);
+      loadAddons();
+      startBgPoll();
+    }
+
+    document.getElementById('btn-signout').addEventListener('click', async () => {
+      await window.electronAPI.logoutUser();
+      S.user = null; S.profile = null; S.activePartner = null;
+      document.getElementById('btn-open-submit')?.classList.add('hidden');
+      stopBgPoll(); stopMsgPoll();
+      document.getElementById('sb-signin-wrap').classList.remove('hidden');
+      document.getElementById('sb-user').classList.add('hidden');
+      document.getElementById('msg-badge').classList.add('hidden');
+      toast('Signed out.');
+      loadAddons();
+    });
+
+    // ────────────────────────────────────────────
+    // PROFILE VIEW
+    // ────────────────────────────────────────────
+    function renderProfileView() {
+      const view = document.getElementById('view-profile');
+
+      if (!S.user) {
+        view.innerHTML = `
+          <div class="vh"><div><div class="vh-title">Profile</div></div></div>
+          <div class="empty-state">
+            <div class="empty-icon">◎</div>
+            <div style="margin-bottom:14px;">Sign in to manage your profile.</div>
+            <button class="btn btn-primary" id="profile-signin-cta">Sign In</button>
+          </div>
+        `;
+        document.getElementById('profile-signin-cta').addEventListener('click', () => {
+          document.getElementById('auth-overlay').classList.remove('hidden');
+        });
+        return;
+      }
+
+      const p    = S.profile || {};
+      const name = p.username || S.user.email.split('@')[0];
+
+      view.innerHTML = `
+        <div class="vh">
+          <div>
+            <div class="vh-title">My Profile</div>
+            <div class="vh-sub">Manage your public identity and private notes</div>
+          </div>
+          <button class="btn btn-primary" id="btn-save-profile">Save Changes</button>
+        </div>
+
+        <div class="profile-hero">
+          <div class="profile-avatar-wrap">
+            <div class="profile-avatar" id="profile-avatar-el"
+              style="${p.avatar_url ? `background-image:url('${esc(p.avatar_url)}')` : ''}">
+              ${!p.avatar_url ? `<span>${esc(name[0].toUpperCase())}</span>` : ''}
+              <div class="avatar-hover">
+                <div class="avatar-hover-icon">📷</div>
+                <div>Change</div>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div class="profile-name" id="profile-name-display">${esc(name)}</div>
+            <div class="profile-email">${esc(S.user.email)}</div>
+            <div style="display:flex;gap:18px;margin-top:10px;" id="profile-stats-row">
+              <div style="font-size:12px;color:var(--text-sub);">
+                <span style="font-weight:700;color:var(--accent);" id="stat-installed">—</span> addons installed
+              </div>
+              <div style="font-size:12px;color:var(--text-sub);">
+                <span style="font-weight:700;color:var(--accent);" id="stat-reviews">—</span> reviews written
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="profile-grid">
+          <div class="psec">
+            <div class="psec-title">Account Info</div>
+            <div class="fg">
+              <label class="fl">Display Name</label>
+              <input type="text" id="edit-username" class="fi" value="${esc(p.username || '')}" placeholder="Your display name">
+            </div>
+            <div class="fg">
+              <label class="fl">Email (read-only)</label>
+              <input type="text" class="fi" value="${esc(S.user.email)}" disabled style="opacity:.4;cursor:not-allowed">
+            </div>
+          </div>
+
+          <div class="psec">
+            <div class="psec-title">Avatar</div>
+            <div class="fg">
+              <label class="fl">Upload Image File</label>
+              <button class="btn btn-outline btn-full" id="btn-upload-avatar">Choose File…</button>
+            </div>
+            <div class="fg">
+              <label class="fl">Or paste an image URL</label>
+              <input type="text" id="edit-avatar-url" class="fi" value="${esc(p.avatar_url || '')}" placeholder="https://...">
+            </div>
+            <div class="fstatus" id="avatar-status"></div>
+          </div>
+
+          <div class="psec wide">
+            <div class="psec-title">Bio</div>
+            <textarea id="edit-bio" class="ft" style="min-height:90px" placeholder="Tell the community a bit about yourself…">${esc(p.bio || '')}</textarea>
+          </div>
+
+          <div class="psec wide">
+            <div class="psec-title">Private Notes</div>
+            <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px;">Only visible to you — great for tracking addon configs, keybinds, or personal tips.</div>
+            <textarea id="edit-notes" class="ft" style="min-height:100px" placeholder="Addon configs, tips, reminders…">${esc(p.notes || '')}</textarea>
+          </div>
+        </div>
+
+        <div class="fstatus" id="save-status" style="margin-top:14px;text-align:center;font-size:13px;"></div>
+      `;
+
+      // Live name preview
+      document.getElementById('edit-username').addEventListener('input', e => {
+        document.getElementById('profile-name-display').textContent = e.target.value || name;
+      });
+
+      // Load profile stats asynchronously
+      (async () => {
+        // Installed count
+        if (S.path && S.addons.length) {
+          const checks = await Promise.all(
+            S.addons.map(a => window.electronAPI.checkAddon({ windowerPath: S.path, addonName: a.folder_name }))
+          );
+          const installedCount = checks.filter(Boolean).length;
+          const el = document.getElementById('stat-installed');
+          if (el) el.textContent = installedCount;
+        } else {
+          const el = document.getElementById('stat-installed');
+          if (el) el.textContent = S.path ? '0' : '?';
+        }
+        // Review count
+        const rRes = await window.electronAPI.getReviewCount(S.user.id);
+        const el2 = document.getElementById('stat-reviews');
+        if (el2) el2.textContent = rRes.success ? rRes.count : '?';
+      })();
+
+      // Avatar click / button
+      document.getElementById('profile-avatar-el').addEventListener('click', doAvatarUpload);
+      document.getElementById('btn-upload-avatar').addEventListener('click', doAvatarUpload);
+
+      document.getElementById('btn-save-profile').addEventListener('click', saveProfile);
+    }
+
+    async function doAvatarUpload() {
+      const statusEl = document.getElementById('avatar-status');
+      if (statusEl) { statusEl.textContent = 'Opening picker…'; statusEl.className = 'fstatus'; }
+
+      const res = await window.electronAPI.uploadAvatar(S.user.id);
+
+      if (res.canceled) { if (statusEl) statusEl.textContent = ''; return; }
+      if (!res.success) {
+        if (statusEl) { statusEl.textContent = res.error || 'Upload failed.'; statusEl.className = 'fstatus err'; }
+        toast('Avatar upload failed — check your Supabase Storage bucket.', true);
+        return;
+      }
+
+      const urlInput = document.getElementById('edit-avatar-url');
+      if (urlInput) urlInput.value = res.url;
+
+      const previewEl = document.getElementById('profile-avatar-el');
+      if (previewEl) {
+        previewEl.style.backgroundImage = `url('${res.url}')`;
+        const span = previewEl.querySelector('span');
+        if (span) span.remove();
+      }
+
+      if (statusEl) { statusEl.textContent = 'Avatar uploaded!'; statusEl.className = 'fstatus ok'; }
+      toast('Avatar updated!');
+    }
+
+    async function saveProfile() {
+      const statusEl = document.getElementById('save-status');
+      const btn      = document.getElementById('btn-save-profile');
+
+      const username   = document.getElementById('edit-username').value.trim();
+      const avatar_url = document.getElementById('edit-avatar-url').value.trim();
+      const bio        = document.getElementById('edit-bio').value.trim();
+      const notes      = document.getElementById('edit-notes').value.trim();
+
+      btn.disabled = true;
+      statusEl.textContent = 'Saving…'; statusEl.className = 'fstatus';
+
+      const res = await window.electronAPI.updateProfile({ userId: S.user.id, username, avatar_url, bio, notes });
+
+      if (res.success) {
+        S.profile = { ...S.profile, username, avatar_url, bio, notes };
+        const displayName = username || S.user.email.split('@')[0];
+        document.getElementById('sb-name-el').textContent = displayName;
+        setAvatar(document.getElementById('sb-avatar-el'), avatar_url, displayName);
+        statusEl.textContent = 'Profile saved!'; statusEl.className = 'fstatus ok';
+        toast('Profile saved!');
+        setTimeout(() => { if (statusEl) statusEl.textContent = ''; }, 3000);
+      } else {
+        statusEl.textContent = res.error || 'Save failed.'; statusEl.className = 'fstatus err';
+      }
+      btn.disabled = false;
+    }
+
+    // ────────────────────────────────────────────
+    // KEYBOARD SHORTCUTS
+    // ────────────────────────────────────────────
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape') {
+        document.getElementById('detail-overlay').classList.add('hidden');
+        document.getElementById('auth-overlay').classList.add('hidden');
+        document.getElementById('submit-overlay').classList.add('hidden');
+        document.getElementById('importer-overlay').classList.add('hidden');
+      }
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
+        const views = ['browse', 'library', 'profile', 'messages'];
+        const idx = parseInt(e.key) - 1;
+        if (idx >= 0 && idx < views.length) { e.preventDefault(); switchView(views[idx]); }
+      }
+    });
+
+    // ────────────────────────────────────────────
+    // GITHUB IMPORTER
+    // ────────────────────────────────────────────
+    let importerRepos = []; // full fetched list
+
+    document.getElementById('btn-open-importer').addEventListener('click', openImporter);
+    document.getElementById('close-importer').addEventListener('click', () => {
+      document.getElementById('importer-overlay').classList.add('hidden');
+    });
+
+    async function openImporter() {
+      document.getElementById('importer-overlay').classList.remove('hidden');
+      document.getElementById('importer-subtitle').innerHTML =
+        'Fetching repositories tagged <code style="background:var(--bg-input);padding:1px 4px;border-radius:3px;">windower-addon</code> on GitHub…';
+      document.getElementById('importer-toolbar').classList.add('hidden');
+      document.getElementById('importer-footer').classList.add('hidden');
+      document.getElementById('importer-list').innerHTML = '<div class="loading-state">Contacting GitHub API…</div>';
+      document.getElementById('importer-search').value = '';
+      importerRepos = [];
+
+      try {
+        // Fetch both topic variants and merge, deduplicated by full_name
+        const [r1, r2] = await Promise.all([
+          fetch('https://api.github.com/search/repositories?q=topic:windower-addon&per_page=100&sort=updated'),
+          fetch('https://api.github.com/search/repositories?q=topic:windower-addons&per_page=100&sort=updated'),
+        ]);
+        const [d1, d2] = await Promise.all([r1.json(), r2.json()]);
+
+        const seen = new Set();
+        const all  = [...(d1.items || []), ...(d2.items || [])].filter(r => {
+          if (seen.has(r.full_name)) return false;
+          seen.add(r.full_name);
+          return true;
+        });
+
+        if (!all.length) {
+          document.getElementById('importer-list').innerHTML =
+            '<div class="empty-state"><div class="empty-icon">◈</div>No repositories found.</div>';
+          return;
+        }
+
+        // Build existing download URL set for dedup
+        const existingUrls = new Set(S.addons.map(a => a.download_url?.split('?')[0]));
+
+        importerRepos = all.map(r => {
+          const branch      = r.default_branch || 'master';
+          const downloadUrl = `https://github.com/${r.full_name}/archive/refs/heads/${branch}.zip`;
+          const alreadyIn   = existingUrls.has(downloadUrl);
+          return {
+            full_name:    r.full_name,
+            name:         r.name,
+            author:       r.owner?.login || '',
+            description:  r.description  || '',
+            folder_name:  r.name,
+            download_url: downloadUrl,
+            stars:        r.stargazers_count || 0,
+            alreadyIn,
+            selected:     !alreadyIn,
+          };
+        });
+
+        // Sort: new ones first, then alphabetical
+        importerRepos.sort((a, b) => {
+          if (a.alreadyIn !== b.alreadyIn) return a.alreadyIn ? 1 : -1;
+          return a.name.localeCompare(b.name);
+        });
+
+        renderImporterList(importerRepos);
+        updateImporterCounts();
+
+        const newCount = importerRepos.filter(r => !r.alreadyIn).length;
+        document.getElementById('importer-subtitle').textContent =
+          `Found ${all.length} repositories — ${newCount} new, ${all.length - newCount} already imported.`;
+        document.getElementById('importer-toolbar').classList.remove('hidden');
+        document.getElementById('importer-footer').classList.remove('hidden');
+
+      } catch (e) {
+        document.getElementById('importer-list').innerHTML =
+          `<div class="empty-state"><div class="empty-icon">⚠</div>Failed to fetch from GitHub: ${esc(e.message)}</div>`;
+      }
+    }
+
+    function renderImporterList(repos) {
+      const list = document.getElementById('importer-list');
+      if (!repos.length) {
+        list.innerHTML = '<div class="empty-state">No results match your filter.</div>';
+        return;
+      }
+      list.innerHTML = '';
+      for (const repo of repos) {
+        list.appendChild(buildImporterRow(repo));
+      }
+    }
+
+    function buildImporterRow(repo) {
+      const row = document.createElement('div');
+      row.dataset.fullName = repo.full_name;
+      row.style.cssText = `display:flex;align-items:flex-start;gap:12px;padding:12px 18px;border-bottom:1px solid var(--border);${repo.alreadyIn ? 'opacity:.45;' : ''}`;
+
+      const cb = document.createElement('input');
+      cb.type    = 'checkbox';
+      cb.checked = repo.selected;
+      cb.disabled = repo.alreadyIn;
+      cb.style.cssText = 'margin-top:3px;flex-shrink:0;accent-color:var(--accent);width:15px;height:15px;cursor:pointer;';
+      cb.addEventListener('change', () => {
+        repo.selected = cb.checked;
+        updateImporterCounts();
+      });
+
+      const info = document.createElement('div');
+      info.style.cssText = 'flex:1;min-width:0;';
+      info.innerHTML = `
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px;">
+          <span style="font-weight:700;font-size:13px;">${esc(repo.name)}</span>
+          <span style="font-size:11px;color:var(--text-muted);">by ${esc(repo.author)}</span>
+          ${repo.stars > 0 ? `<span style="font-size:11px;color:var(--text-muted);margin-left:auto;">★ ${repo.stars}</span>` : ''}
+          ${repo.alreadyIn ? '<span class="badge-installed" style="margin-left:auto;">Already imported</span>' : ''}
+        </div>
+        <div style="font-size:12px;color:var(--text-sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(repo.description || 'No description.')}</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:3px;font-family:monospace;">${esc(repo.download_url)}</div>
+      `;
+
+      row.appendChild(cb);
+      row.appendChild(info);
+      return row;
+    }
+
+    function updateImporterCounts() {
+      const selected = importerRepos.filter(r => r.selected && !r.alreadyIn).length;
+      const label    = document.getElementById('importer-selection-label');
+      const btn      = document.getElementById('btn-do-import');
+      const count    = document.getElementById('importer-count');
+      if (label) label.textContent = `${selected} selected`;
+      if (btn)   { btn.disabled = selected === 0; btn.textContent = selected > 0 ? `Import ${selected} Addon${selected !== 1 ? 's' : ''}` : 'Import Selected'; }
+      if (count) count.textContent = `${importerRepos.filter(r => !r.alreadyIn).length} available`;
+    }
+
+    // Toolbar: select/deselect all, filter
+    document.getElementById('btn-select-all').addEventListener('click', () => {
+      importerRepos.forEach(r => { if (!r.alreadyIn) r.selected = true; });
+      renderImporterList(getFilteredRepos());
+      updateImporterCounts();
+    });
+    document.getElementById('btn-deselect-all').addEventListener('click', () => {
+      importerRepos.forEach(r => { r.selected = false; });
+      renderImporterList(getFilteredRepos());
+      updateImporterCounts();
+    });
+
+    let importerFilterDebounce;
+    document.getElementById('importer-search').addEventListener('input', e => {
+      clearTimeout(importerFilterDebounce);
+      importerFilterDebounce = setTimeout(() => renderImporterList(getFilteredRepos()), 150);
+    });
+
+    function getFilteredRepos() {
+      const q = document.getElementById('importer-search').value.trim().toLowerCase();
+      if (!q) return importerRepos;
+      return importerRepos.filter(r =>
+        r.name.toLowerCase().includes(q) ||
+        r.author.toLowerCase().includes(q) ||
+        (r.description || '').toLowerCase().includes(q)
+      );
+    }
+
+    // Import
+    document.getElementById('btn-do-import').addEventListener('click', async () => {
+      const toImport = importerRepos.filter(r => r.selected && !r.alreadyIn).map(r => ({
+        name:         r.name,
+        author:       r.author,
+        description:  r.description,
+        folder_name:  r.folder_name,
+        download_url: r.download_url,
+      }));
+
+      if (!toImport.length) return;
+
+      const btn = document.getElementById('btn-do-import');
+      btn.disabled = true;
+      btn.textContent = 'Importing…';
+
+      const res = await window.electronAPI.bulkSubmitAddons(toImport);
+
+      if (res.success) {
+        document.getElementById('importer-overlay').classList.add('hidden');
+        toast(`${toImport.length} addon${toImport.length !== 1 ? 's' : ''} imported!`);
+        loadAddons();
+      } else {
+        btn.disabled = false;
+        btn.textContent = `Import ${toImport.length} Addons`;
+        toast(`Import failed: ${res.error}`, true);
+      }
+    });
+
+    // ────────────────────────────────────────────
+    // SUBMIT ADDON
+    // ────────────────────────────────────────────
+    document.getElementById('btn-open-submit').addEventListener('click', () => {
+      // Clear previous values
+      ['sub-github','sub-name','sub-author','sub-desc','sub-folder','sub-url'].forEach(id => {
+        document.getElementById(id).value = '';
+      });
+      document.getElementById('sub-github-status').textContent = '';
+      document.getElementById('submit-status').textContent = '';
+      document.getElementById('submit-overlay').classList.remove('hidden');
+      document.getElementById('sub-github').focus();
+    });
+
+    document.getElementById('close-submit').addEventListener('click', () => {
+      document.getElementById('submit-overlay').classList.add('hidden');
+    });
+
+    // GitHub URL auto-fill
+    let githubDebounce;
+    document.getElementById('sub-github').addEventListener('input', e => {
+      clearTimeout(githubDebounce);
+      githubDebounce = setTimeout(() => autoFillFromGitHub(e.target.value.trim()), 500);
+    });
+
+    async function autoFillFromGitHub(url) {
+      if (!url) return;
+      const match = url.match(/github\.com\/([^\/\s]+)\/([^\/\s#?]+)/);
+      if (!match) return;
+
+      const owner     = match[1];
+      const repo      = match[2].replace(/\.git$/, '');
+      const statusEl  = document.getElementById('sub-github-status');
+
+      // Fill what we know immediately
+      document.getElementById('sub-name').value   = repo;
+      document.getElementById('sub-author').value = owner;
+      document.getElementById('sub-folder').value = repo;
+
+      statusEl.textContent = 'Fetching repo info…';
+      statusEl.className   = 'fstatus';
+
+      try {
+        const res  = await fetch(`https://api.github.com/repos/${owner}/${repo}`);
+        if (!res.ok) throw new Error('Not found');
+        const data = await res.json();
+
+        const branch = data.default_branch || 'master';
+        document.getElementById('sub-url').value  =
+          `https://github.com/${owner}/${repo}/archive/refs/heads/${branch}.zip`;
+
+        if (data.description) document.getElementById('sub-desc').value = data.description;
+        if (data.name)        document.getElementById('sub-name').value  = data.name;
+
+        statusEl.textContent = `✓ Found: ${data.full_name} (${branch} branch)`;
+        statusEl.className   = 'fstatus ok';
+      } catch {
+        // Fall back to master — GitHub API unavailable or private repo
+        document.getElementById('sub-url').value =
+          `https://github.com/${owner}/${repo}/archive/refs/heads/master.zip`;
+        statusEl.textContent = 'Could not reach GitHub API — download URL set to master branch.';
+        statusEl.className   = 'fstatus';
+      }
+    }
+
+    document.getElementById('btn-do-submit').addEventListener('click', async () => {
+      const name        = document.getElementById('sub-name').value.trim();
+      const author      = document.getElementById('sub-author').value.trim();
+      const description = document.getElementById('sub-desc').value.trim();
+      const folder_name = document.getElementById('sub-folder').value.trim();
+      const download_url = document.getElementById('sub-url').value.trim();
+      const statusEl    = document.getElementById('submit-status');
+      const btn         = document.getElementById('btn-do-submit');
+
+      if (!name || !author || !folder_name || !download_url) {
+        statusEl.textContent = 'Please fill in all required fields.';
+        statusEl.className   = 'fstatus err';
+        return;
+      }
+      if (!download_url.startsWith('http') || !download_url.endsWith('.zip')) {
+        statusEl.textContent = 'Download URL must be a direct link to a .zip file.';
+        statusEl.className   = 'fstatus err';
+        return;
+      }
+
+      btn.disabled = true;
+      statusEl.textContent = 'Submitting…';
+      statusEl.className   = 'fstatus';
+
+      const res = await window.electronAPI.submitAddon({ name, author, description, folder_name, download_url });
+
+      if (res.success) {
+        statusEl.textContent = '✓ Addon submitted! It will appear in Browse shortly.';
+        statusEl.className   = 'fstatus ok';
+        btn.disabled = false;
+        setTimeout(() => {
+          document.getElementById('submit-overlay').classList.add('hidden');
+          loadAddons();
+        }, 1800);
+      } else {
+        statusEl.textContent = res.error || 'Submission failed.';
+        statusEl.className   = 'fstatus err';
+        btn.disabled = false;
+      }
+    });
+
+    // ────────────────────────────────────────────
+    // MESSAGES
+    // ────────────────────────────────────────────
+    S.activePartner = null;
+    S.msgPollTimer  = null;
+
+    function onMessagesView() {
+      if (!S.user) {
+        document.getElementById('conv-list').innerHTML = '<div class="conv-empty">Sign in to use messaging.</div>';
+        document.getElementById('thread-panel').innerHTML = '<div class="thread-placeholder"><div class="thread-placeholder-icon">✉</div><div>Sign in to send messages</div></div>';
+        return;
+      }
+      loadConversations();
+      if (S.activePartner) {
+        renderThread(S.activePartner);
+        loadMessages();
+      }
+      startMsgPoll();
+    }
+
+    async function loadConversations() {
+      if (!S.user) return;
+      const res = await window.electronAPI.getConversations(S.user.id);
+      if (!res.success) return;
+
+      const list = document.getElementById('conv-list');
+      if (!list) return;
+
+      if (!res.data.length) {
+        list.innerHTML = '<div class="conv-empty">No conversations yet.<br>Click "+ New" to start one.</div>';
+      } else {
+        list.innerHTML = '';
+        for (const conv of res.data) list.appendChild(buildConvItem(conv));
+      }
+
+      const total = res.data.reduce((n, c) => n + c.unreadCount, 0);
+      const badge = document.getElementById('msg-badge');
+      if (total > 0) { badge.textContent = total > 99 ? '99+' : total; badge.classList.remove('hidden'); }
+      else badge.classList.add('hidden');
+    }
+
+    function buildConvItem(conv) {
+      const el   = document.createElement('div');
+      const name = conv.partner?.username || 'Unknown';
+      const url  = conv.partner?.avatar_url || '';
+      const isActive = S.activePartner?.id === conv.partnerId;
+      el.className = `conv-item${isActive ? ' active' : ''}`;
+      el.dataset.partnerId = conv.partnerId;
+
+      const preview = conv.lastMessage.sender_id === S.user.id
+        ? `You: ${conv.lastMessage.content}`
+        : conv.lastMessage.content;
+
+      el.innerHTML = `
+        <div class="conv-av" ${url ? `style="background-image:url('${esc(url)}')"` : ''}>${url ? '' : esc(name[0].toUpperCase())}</div>
+        <div class="conv-info">
+          <div class="conv-name-row">
+            <div class="conv-name">${esc(name)}</div>
+            ${conv.unreadCount > 0 ? `<span class="conv-unread">${conv.unreadCount}</span>` : ''}
+          </div>
+          <div class="conv-preview">${esc(preview.substring(0, 55))}</div>
+        </div>
+      `;
+      el.addEventListener('click', () => openConversation(conv.partner));
+      return el;
+    }
+
+    async function openConversation(partner) {
+      S.activePartner = partner;
+      document.querySelectorAll('.conv-item').forEach(el => {
+        el.classList.toggle('active', el.dataset.partnerId === partner.id);
+      });
+      await window.electronAPI.markRead({ userId: S.user.id, partnerId: partner.id });
+      renderThread(partner);
+      await loadMessages();
+      loadConversations();
+    }
+
+    function renderThread(partner) {
+      const panel = document.getElementById('thread-panel');
+      const name  = partner.username || 'Unknown';
+      const url   = partner.avatar_url || '';
+
+      panel.innerHTML = `
+        <div class="thread-head">
+          <div class="conv-av" ${url ? `style="background-image:url('${esc(url)}')"` : ''}>${url ? '' : esc(name[0].toUpperCase())}</div>
+          <div class="thread-head-name">${esc(name)}</div>
+        </div>
+        <div class="thread-msgs" id="thread-msgs"></div>
+        <div class="thread-input-row">
+          <textarea id="thread-input" class="thread-input" rows="1" placeholder="Message ${esc(name)}…"></textarea>
+          <button class="btn btn-primary" id="btn-send-msg">Send</button>
+        </div>
+      `;
+
+      const input = document.getElementById('thread-input');
+      input.addEventListener('input', function () {
+        this.style.height = 'auto';
+        this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+      });
+      input.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); doSendMessage(); } });
+      document.getElementById('btn-send-msg').addEventListener('click', doSendMessage);
+      input.focus();
+    }
+
+    async function loadMessages() {
+      if (!S.activePartner || !S.user) return;
+      const msgsEl = document.getElementById('thread-msgs');
+      if (!msgsEl) return;
+
+      const res = await window.electronAPI.getMessages({ userId: S.user.id, partnerId: S.activePartner.id });
+      if (!res.success) { msgsEl.innerHTML = '<div style="color:var(--text-muted);text-align:center;padding:20px;font-size:13px;">Failed to load messages.</div>'; return; }
+      if (!res.data.length) { msgsEl.innerHTML = '<div style="color:var(--text-muted);text-align:center;padding:30px;font-size:13px;">No messages yet — say hello!</div>'; return; }
+
+      const atBottom = msgsEl.scrollHeight - msgsEl.scrollTop - msgsEl.clientHeight < 60;
+      msgsEl.innerHTML = '';
+
+      let lastDate = null;
+      let lastSender = null;
+      for (const msg of res.data) {
+        const d = new Date(msg.created_at).toDateString();
+        if (d !== lastDate) {
+          msgsEl.appendChild(buildDateSep(msg.created_at));
+          lastDate = d;
+          lastSender = null;
+        }
+        const grouped = lastSender === msg.sender_id;
+        msgsEl.appendChild(buildMsgBubble(msg, grouped));
+        lastSender = msg.sender_id;
+      }
+
+      if (atBottom) msgsEl.scrollTop = msgsEl.scrollHeight;
+    }
+
+    function buildDateSep(ts) {
+      const d = new Date(ts);
+      const now = new Date();
+      const yesterday = new Date(now - 86400000);
+      let label;
+      if (d.toDateString() === now.toDateString()) label = 'Today';
+      else if (d.toDateString() === yesterday.toDateString()) label = 'Yesterday';
+      else label = d.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' });
+      const el = document.createElement('div');
+      el.className = 'msg-date-sep';
+      el.textContent = label;
+      return el;
+    }
+
+    function buildMsgBubble(msg, grouped = false) {
+      const isMine = msg.sender_id === S.user.id;
+      const wrap   = document.createElement('div');
+      wrap.className = `msg-wrap${isMine ? ' mine' : ''}${grouped ? ' grouped' : ''}`;
+
+      const name = isMine ? (S.profile?.username || 'You') : (S.activePartner?.username || 'Unknown');
+      const url  = isMine ? (S.profile?.avatar_url || '') : (S.activePartner?.avatar_url || '');
+
+      wrap.innerHTML = `
+        <div class="msg-av${grouped ? ' ghost' : ''}" ${url ? `style="background-image:url('${esc(url)}')"` : ''}>${url ? '' : esc(name[0].toUpperCase())}</div>
+        <div class="msg-content">
+          <div class="msg-bubble">${esc(msg.content)}</div>
+          ${!grouped ? `<div class="msg-time">${formatMsgTime(msg.created_at)}</div>` : ''}
+        </div>
+      `;
+      return wrap;
+    }
+
+    async function doSendMessage() {
+      const input = document.getElementById('thread-input');
+      if (!input) return;
+      const content = input.value.trim();
+      if (!content || !S.activePartner || !S.user) return;
+
+      const btn = document.getElementById('btn-send-msg');
+      btn.disabled = true;
+      input.disabled = true;
+
+      const res = await window.electronAPI.sendMessage({ senderId: S.user.id, receiverId: S.activePartner.id, content });
+
+      btn.disabled = false;
+      input.disabled = false;
+
+      if (res.success) {
+        input.value = '';
+        input.style.height = 'auto';
+        await loadMessages();
+        loadConversations();
+      } else {
+        toast('Failed to send message.', true);
+      }
+      input.focus();
+    }
+
+    function formatMsgTime(ts) {
+      const d   = new Date(ts);
+      const now = new Date();
+      return d.toDateString() === now.toDateString()
+        ? d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        : d.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    document.getElementById('btn-new-dm').addEventListener('click', showNewDmPanel);
+
+    function showNewDmPanel() {
+      S.activePartner = null;
+      document.querySelectorAll('.conv-item').forEach(el => el.classList.remove('active'));
+
+      document.getElementById('thread-panel').innerHTML = `
+        <div class="search-panel">
+          <div class="search-panel-title">New Message</div>
+          <input type="text" id="user-search-input" class="fi" placeholder="Search by username…">
+          <div id="user-search-results" style="margin-top:10px;"></div>
+        </div>
+      `;
+
+      const input = document.getElementById('user-search-input');
+      input.focus();
+      let debounce;
+      input.addEventListener('input', e => {
+        clearTimeout(debounce);
+        const q = e.target.value.trim();
+        if (q.length < 2) { document.getElementById('user-search-results').innerHTML = ''; return; }
+        debounce = setTimeout(() => doUserSearch(q), 300);
+      });
+    }
+
+    async function doUserSearch(query) {
+      const resultsEl = document.getElementById('user-search-results');
+      if (!resultsEl) return;
+      resultsEl.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:6px 0;">Searching…</div>';
+
+      const res = await window.electronAPI.searchUsers({ query, currentUserId: S.user.id });
+      if (!res.success || !res.data.length) {
+        resultsEl.innerHTML = '<div style="color:var(--text-muted);font-size:12px;padding:6px 0;">No users found.</div>';
+        return;
+      }
+
+      resultsEl.innerHTML = '';
+      for (const user of res.data) {
+        const div  = document.createElement('div');
+        div.className = 'user-result';
+        const name = user.username || 'Unknown';
+        const url  = user.avatar_url || '';
+        div.innerHTML = `
+          <div class="conv-av" ${url ? `style="background-image:url('${esc(url)}')"` : ''}>${url ? '' : esc(name[0].toUpperCase())}</div>
+          <div class="user-result-name">${esc(name)}</div>
+        `;
+        div.addEventListener('click', () => openConversation(user));
+        resultsEl.appendChild(div);
+      }
+    }
+
+    function startMsgPoll() {
+      stopMsgPoll();
+      S.msgPollTimer = setInterval(async () => {
+        await loadConversations();
+        if (S.activePartner) await loadMessages();
+      }, 8000);
+    }
+
+    function stopMsgPoll() {
+      if (S.msgPollTimer) { clearInterval(S.msgPollTimer); S.msgPollTimer = null; }
+    }
+
+    // Lightweight background poll — keeps unread badge accurate on any view
+    S.bgPollTimer = null;
+    function startBgPoll() {
+      if (S.bgPollTimer) return;
+      S.bgPollTimer = setInterval(() => { if (S.user) loadConversations(); }, 30000);
+    }
+    function stopBgPoll() {
+      clearInterval(S.bgPollTimer); S.bgPollTimer = null;
+    }
+
+    // ────────────────────────────────────────────
+    // INIT
+    // ────────────────────────────────────────────
+    async function checkExistingSession() {
+      const res = await window.electronAPI.getSession();
+      if (res.success) await onLogin(res, false); // silent — no welcome toast
+    }
+
+    updatePathBar();
+    loadAddons();
+    checkExistingSession();
+  </script>
+</body>
+</html>
