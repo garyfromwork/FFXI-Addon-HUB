@@ -511,6 +511,51 @@ ipcMain.handle('fetch-addon-readme', async (_event, { repositoryUrl }) => {
   }
 });
 
+// Upload an addon zip directly to Supabase Storage (50 MB limit)
+const MAX_ADDON_ZIP_SIZE = 50 * 1024 * 1024; // 50 MB
+
+ipcMain.handle('upload-addon-zip', async (_event, userId) => {
+  try {
+    const result = await dialog.showOpenDialog({
+      title: 'Select Addon Zip File',
+      properties: ['openFile'],
+      filters: [{ name: 'Zip Archives', extensions: ['zip'] }]
+    });
+
+    if (result.canceled) return { canceled: true };
+
+    const filePath = result.filePaths[0];
+    const stats    = fs.statSync(filePath);
+
+    if (stats.size > MAX_ADDON_ZIP_SIZE) {
+      const mb = (stats.size / 1024 / 1024).toFixed(1);
+      return { success: false, error: `File is ${mb} MB — the maximum allowed size is 50 MB.` };
+    }
+
+    const fileBuffer  = fs.readFileSync(filePath);
+    const fileName    = path.basename(filePath);
+    const storagePath = `${userId}/${Date.now()}-${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('addon-files')
+      .upload(storagePath, fileBuffer, { contentType: 'application/zip', upsert: false });
+
+    if (uploadError) throw uploadError;
+
+    const { data: urlData } = supabase.storage.from('addon-files').getPublicUrl(storagePath);
+
+    return {
+      success:  true,
+      url:      urlData.publicUrl,
+      name:     path.basename(fileName, '.zip'), // suggested addon name
+      sizeMb:   (stats.size / 1024 / 1024).toFixed(2),
+    };
+  } catch (error) {
+    console.error('upload-addon-zip error:', error.message);
+    return { success: false, error: error.message };
+  }
+});
+
 // Update tags on an addon (admin only — RLS enforces)
 ipcMain.handle('update-addon-tags', async (_event, { addonId, tags }) => {
   try {

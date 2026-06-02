@@ -46,4 +46,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
   submitReport:        (data)   => ipcRenderer.invoke('submit-report', data),
   updateAddonTags:     (data)   => ipcRenderer.invoke('update-addon-tags', data),
   fetchAddonReadme:    (data)   => ipcRenderer.invoke('fetch-addon-readme', data),
+  uploadAddonZip:      (userId) => ipcRenderer.invoke('upload-addon-zip', userId),
 });

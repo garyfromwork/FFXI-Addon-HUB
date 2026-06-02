@@ -884,8 +884,8 @@
       <div class="modal-body-pad" style="overflow-y:auto;flex:1;">
 
       <div class="fg">
-        <label class="fl">GitHub Repository URL <span style="color:var(--text-muted);font-weight:400;text-transform:none;letter-spacing:0;">— paste to auto-fill fields below</span></label>
-        <input type="text" id="sub-github" class="fi" placeholder="https://github.com/author/addon-name">
+        <label class="fl">Repository URL <span style="color:var(--text-muted);font-weight:400;text-transform:none;letter-spacing:0;">— GitHub, GitLab, or Codeberg — paste to auto-fill</span></label>
+        <input type="text" id="sub-github" class="fi" placeholder="https://github.com/author/addon  ·  https://gitlab.com/…  ·  https://codeberg.org/…">
         <div class="fstatus" id="sub-github-status"></div>
       </div>
 
@@ -913,13 +913,18 @@
       </div>
 
       <div class="fg">
-        <label class="fl">Download URL <span style="color:var(--red);">*</span> <span style="color:var(--text-muted);font-weight:400;text-transform:none;letter-spacing:0;">— direct link to .zip file</span></label>
-        <input type="text" id="sub-url" class="fi" placeholder="https://github.com/author/repo/archive/refs/heads/master.zip">
+        <label class="fl">Download URL <span style="color:var(--red);">*</span> <span style="color:var(--text-muted);font-weight:400;text-transform:none;letter-spacing:0;">— direct link to a zip file, or use Upload below</span></label>
+        <input type="text" id="sub-url" class="fi" placeholder="https://…/archive.zip">
+        <div style="display:flex;align-items:center;gap:10px;margin-top:8px;">
+          <button class="btn btn-outline btn-sm" id="btn-upload-addon-zip" type="button">⬆ Upload zip file…</button>
+          <div class="fstatus" id="sub-upload-status" style="margin:0;"></div>
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:5px;">Upload directly — no hosting required. Max 50 MB.</div>
       </div>
 
       <div class="fg">
-        <label class="fl">Repository URL <span style="color:var(--red);">*</span> <span style="color:var(--text-muted);font-weight:400;text-transform:none;letter-spacing:0;">— where users can view the source</span></label>
-        <input type="text" id="sub-repo" class="fi" placeholder="https://github.com/author/addon-name">
+        <label class="fl">Repository / Source URL <span style="color:var(--text-muted);font-weight:400;text-transform:none;letter-spacing:0;">— optional but recommended</span></label>
+        <input type="text" id="sub-repo" class="fi" placeholder="https://github.com/…  ·  https://gitlab.com/…  ·  personal website, forum post, etc.">
       </div>
 
       <div class="fg">
@@ -2477,7 +2482,8 @@
       });
       document.getElementById('sub-github-status').textContent = '';
       document.getElementById('submit-status').textContent = '';
-      buildTagPicker('sub-tag-grid', []); // reset tag checkboxes
+      document.getElementById('sub-upload-status').textContent = '';
+      buildTagPicker('sub-tag-grid', []);
       document.getElementById('submit-overlay').classList.remove('hidden');
       document.getElementById('sub-github').focus();
     });
@@ -2486,56 +2492,127 @@
       document.getElementById('submit-overlay').classList.add('hidden');
     });
 
-    // GitHub URL auto-fill
-    let githubDebounce;
+    // Multi-platform auto-fill dispatcher
+    let repoDebounce;
     document.getElementById('sub-github').addEventListener('input', e => {
-      clearTimeout(githubDebounce);
-      githubDebounce = setTimeout(() => autoFillFromGitHub(e.target.value.trim()), 500);
+      clearTimeout(repoDebounce);
+      const url = e.target.value.trim();
+      if (!url) return;
+      repoDebounce = setTimeout(() => autoFillFromUrl(url), 500);
     });
 
+    async function autoFillFromUrl(url) {
+      if (url.includes('github.com'))   return autoFillFromGitHub(url);
+      if (url.includes('gitlab.com'))   return autoFillFromGitLab(url);
+      if (url.includes('codeberg.org')) return autoFillFromCodeberg(url);
+      // Unknown platform — just set as the repo URL
+      document.getElementById('sub-repo').value = url;
+      const s = document.getElementById('sub-github-status');
+      s.textContent = 'URL saved. Fill the remaining fields manually.';
+      s.className = 'fstatus';
+    }
+
     async function autoFillFromGitHub(url) {
-      if (!url) return;
       const match = url.match(/github\.com\/([^\/\s]+)\/([^\/\s#?]+)/);
       if (!match) return;
-
-      const owner     = match[1];
-      const repo      = match[2].replace(/\.git$/, '');
-      const statusEl  = document.getElementById('sub-github-status');
-
-      // Fill what we know immediately
-      document.getElementById('sub-name').value   = repo;
-      document.getElementById('sub-author').value = owner;
-      document.getElementById('sub-folder').value = repo;
-
-      statusEl.textContent = 'Fetching repo info…';
-      statusEl.className   = 'fstatus';
-
+      const owner = match[1];
+      const repo  = match[2].replace(/\.git$/, '');
+      const s     = document.getElementById('sub-github-status');
+      _fillBasicFields(owner, repo);
+      document.getElementById('sub-repo').value = `https://github.com/${owner}/${repo}`;
+      s.textContent = 'Fetching repo info…'; s.className = 'fstatus';
       try {
         const res  = await fetch(`https://api.github.com/repos/${owner}/${repo}`);
-        if (!res.ok) throw new Error('Not found');
+        if (!res.ok) throw new Error();
         const data = await res.json();
-
-        const branch = data.default_branch || 'master';
-        document.getElementById('sub-url').value  =
-          `https://github.com/${owner}/${repo}/archive/refs/heads/${branch}.zip`;
-        document.getElementById('sub-repo').value =
-          `https://github.com/${owner}/${repo}`;
-
+        const br   = data.default_branch || 'master';
+        document.getElementById('sub-url').value = `https://github.com/${owner}/${repo}/archive/refs/heads/${br}.zip`;
         if (data.description) document.getElementById('sub-desc').value = data.description;
         if (data.name)        document.getElementById('sub-name').value  = data.name;
-
-        statusEl.textContent = `✓ Found: ${data.full_name} (${branch} branch)`;
-        statusEl.className   = 'fstatus ok';
+        s.textContent = `✓ GitHub: ${data.full_name} (${br})`; s.className = 'fstatus ok';
       } catch {
-        // Fall back to master — GitHub API unavailable or private repo
-        document.getElementById('sub-url').value  =
-          `https://github.com/${owner}/${repo}/archive/refs/heads/master.zip`;
-        document.getElementById('sub-repo').value =
-          `https://github.com/${owner}/${repo}`;
-        statusEl.textContent = 'Could not reach GitHub API — download URL set to master branch.';
-        statusEl.className   = 'fstatus';
+        document.getElementById('sub-url').value = `https://github.com/${owner}/${repo}/archive/refs/heads/master.zip`;
+        s.textContent = 'GitHub API unavailable — using master branch.'; s.className = 'fstatus';
       }
     }
+
+    async function autoFillFromGitLab(url) {
+      const match = url.match(/gitlab\.com\/([^\/\s]+)\/([^\/\s#?]+)/);
+      if (!match) return;
+      const user = match[1];
+      const repo = match[2].replace(/\.git$/, '');
+      const s    = document.getElementById('sub-github-status');
+      _fillBasicFields(user, repo);
+      document.getElementById('sub-repo').value = `https://gitlab.com/${user}/${repo}`;
+      s.textContent = 'Fetching repo info…'; s.className = 'fstatus';
+      try {
+        const res  = await fetch(`https://gitlab.com/api/v4/projects/${encodeURIComponent(`${user}/${repo}`)}`);
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        const br   = data.default_branch || 'main';
+        document.getElementById('sub-url').value = `https://gitlab.com/${user}/${repo}/-/archive/${br}/${repo}-${br}.zip`;
+        if (data.description) document.getElementById('sub-desc').value = data.description;
+        if (data.name)        document.getElementById('sub-name').value  = data.name;
+        s.textContent = `✓ GitLab: ${data.name_with_namespace} (${br})`; s.className = 'fstatus ok';
+      } catch {
+        document.getElementById('sub-url').value = `https://gitlab.com/${user}/${repo}/-/archive/main/${repo}-main.zip`;
+        s.textContent = 'GitLab API unavailable — using main branch.'; s.className = 'fstatus';
+      }
+    }
+
+    async function autoFillFromCodeberg(url) {
+      const match = url.match(/codeberg\.org\/([^\/\s]+)\/([^\/\s#?]+)/);
+      if (!match) return;
+      const user = match[1];
+      const repo = match[2].replace(/\.git$/, '');
+      const s    = document.getElementById('sub-github-status');
+      _fillBasicFields(user, repo);
+      document.getElementById('sub-repo').value = `https://codeberg.org/${user}/${repo}`;
+      s.textContent = 'Fetching repo info…'; s.className = 'fstatus';
+      try {
+        const res  = await fetch(`https://codeberg.org/api/v1/repos/${user}/${repo}`);
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        const br   = data.default_branch || 'main';
+        document.getElementById('sub-url').value = `https://codeberg.org/${user}/${repo}/archive/${br}.zip`;
+        if (data.description) document.getElementById('sub-desc').value = data.description;
+        if (data.name)        document.getElementById('sub-name').value  = data.name;
+        s.textContent = `✓ Codeberg: ${user}/${repo} (${br})`; s.className = 'fstatus ok';
+      } catch {
+        document.getElementById('sub-url').value = `https://codeberg.org/${user}/${repo}/archive/main.zip`;
+        s.textContent = 'Codeberg API unavailable — using main branch.'; s.className = 'fstatus';
+      }
+    }
+
+    function _fillBasicFields(author, repoName) {
+      document.getElementById('sub-name').value   = repoName;
+      document.getElementById('sub-author').value = author;
+      document.getElementById('sub-folder').value = repoName;
+    }
+
+    // Direct zip upload
+    document.getElementById('btn-upload-addon-zip').addEventListener('click', async () => {
+      if (!S.user) { toast('Sign in to upload files.', true); return; }
+      const btn  = document.getElementById('btn-upload-addon-zip');
+      const stat = document.getElementById('sub-upload-status');
+      btn.disabled = true;
+      stat.textContent = 'Opening file picker…'; stat.className = 'fstatus';
+
+      const res = await window.electronAPI.uploadAddonZip(S.user.id);
+
+      btn.disabled = false;
+      if (res.canceled) { stat.textContent = ''; return; }
+      if (!res.success) {
+        stat.textContent = res.error || 'Upload failed.'; stat.className = 'fstatus err';
+        return;
+      }
+
+      document.getElementById('sub-url').value = res.url;
+      if (!document.getElementById('sub-name').value) document.getElementById('sub-name').value = res.name;
+      if (!document.getElementById('sub-folder').value) document.getElementById('sub-folder').value = res.name;
+
+      stat.textContent = `✓ Uploaded (${res.sizeMb} MB)`; stat.className = 'fstatus ok';
+    });
 
     document.getElementById('btn-do-submit').addEventListener('click', async () => {
       const name         = document.getElementById('sub-name').value.trim();
@@ -2552,13 +2629,13 @@
       const statusEl = document.getElementById('submit-status');
       const btn      = document.getElementById('btn-do-submit');
 
-      if (!name || !author || !folder_name || !download_url || !repository_url) {
-        statusEl.textContent = 'Please fill in all required fields, including the repository URL.';
+      if (!name || !author || !folder_name || !download_url) {
+        statusEl.textContent = 'Name, Author, Folder Name, and Download URL are required.';
         statusEl.className   = 'fstatus err';
         return;
       }
-      if (!download_url.startsWith('http') || !download_url.endsWith('.zip')) {
-        statusEl.textContent = 'Download URL must be a direct link to a .zip file.';
+      if (!download_url.startsWith('http')) {
+        statusEl.textContent = 'Download URL must be a valid http/https link.';
         statusEl.className   = 'fstatus err';
         return;
       }
