@@ -10,6 +10,7 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     strategy:
+      fail-fast: false   # let Windows finish even if Ubuntu fails, and vice versa
       matrix:
         os: [windows-latest, ubuntu-latest]
 
@@ -20,23 +21,21 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22   # LTS — avoids Node 20 deprecation warnings
 
-      - name: Install dependencies
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y rpm fakeroot
+
+      - name: Install npm dependencies
         run: npm install
 
       - name: Create config.js from secrets
-        run: |
-          node -e "
-            const fs = require('fs');
-            fs.writeFileSync('config.js', \`module.exports = {
-              supabaseUrl: '\${process.env.SUPABASE_URL}',
-              supabaseKey: '\${process.env.SUPABASE_KEY}',
-            };\`);
-          "
+        # Avoid template literals / backticks — bash treats them as command substitution
+        run: node -e "var fs=require('fs'),u=process.env.SB_URL,k=process.env.SB_KEY;fs.writeFileSync('config.js','module.exports={supabaseUrl:\"'+u+'\",supabaseKey:\"'+k+'\"};');"
         env:
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+          SB_URL: ${{ secrets.SUPABASE_URL }}
+          SB_KEY: ${{ secrets.SUPABASE_KEY }}
 
       - name: Build and publish
         env:
