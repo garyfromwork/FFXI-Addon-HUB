@@ -190,8 +190,9 @@ function initAutoUpdater() {
 
   // Route updater messages to electron-log if available; fall back to console
   // so a missing module can never prevent the update check from running.
+  let log = console;
   try {
-    const log = require('electron-log');
+    log = require('electron-log');
     log.transports.file.level = 'info';
     autoUpdater.logger = log;
     log.info('Auto-updater initialising. App version:', app.getVersion());
