@@ -188,11 +188,16 @@ function initAutoUpdater() {
   // Skip entirely in development — checkForUpdates always fails outside a packaged app
   if (!app.isPackaged) return;
 
-  // Route all internal updater messages to electron-log for diagnostics
-  const log = require('electron-log');
-  autoUpdater.logger = log;
-  log.transports.file.level = 'info';
-  log.info('Auto-updater initialising. App version:', app.getVersion());
+  // Route updater messages to electron-log if available; fall back to console
+  // so a missing module can never prevent the update check from running.
+  try {
+    const log = require('electron-log');
+    log.transports.file.level = 'info';
+    autoUpdater.logger = log;
+    log.info('Auto-updater initialising. App version:', app.getVersion());
+  } catch {
+    autoUpdater.logger = console;
+  }
 
   autoUpdater.autoDownload    = true;   // download as soon as update is found
   autoUpdater.allowPrerelease = false;  // only full releases, not pre-releases
