@@ -400,6 +400,58 @@ ipcMain.handle('login-user', async (event, { email, password }) => {
 // App version
 ipcMain.handle('get-app-version', () => app.getVersion());
 
+// Open URL in the system browser
+ipcMain.handle('open-external', (_event, url) => shell.openExternal(url));
+
+// Check if the current user is an admin
+ipcMain.handle('check-is-admin', async (_event, userId) => {
+  try {
+    const { data } = await supabase
+      .from('profiles')
+      .select('is_admin')
+      .eq('id', userId)
+      .maybeSingle();
+    return { isAdmin: data?.is_admin === true };
+  } catch { return { isAdmin: false }; }
+});
+
+// Get all pending addon submissions (admin only — DB enforces via RLS)
+ipcMain.handle('get-pending-submissions', async () => {
+  try {
+    const { data: addons, error } = await supabase
+      .from('addons')
+      .select('*')
+      .eq('status', 'pending')
+      .order('name', { ascending: true });
+    if (error) throw error;
+
+    // Fetch submitter usernames
+    const ids = [...new Set(addons.map(a => a.submitted_by).filter(Boolean))];
+    const { data: profiles } = ids.length
+      ? await supabase.from('profiles').select('id, username').in('id', ids)
+      : { data: [] };
+    const pm = Object.fromEntries((profiles || []).map(p => [p.id, p]));
+
+    return { success: true, data: addons.map(a => ({ ...a, submitter: pm[a.submitted_by] || null })) };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// Approve or reject a submission
+ipcMain.handle('moderate-addon', async (_event, { addonId, status }) => {
+  try {
+    const { error } = await supabase
+      .from('addons')
+      .update({ status })
+      .eq('id', addonId);
+    if (error) throw error;
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
 // Log file path — shown in Settings so users can find it for debugging
 ipcMain.handle('get-log-path', () => {
   try {
@@ -424,6 +476,139 @@ ipcMain.handle('check-for-updates', async () => {
   } catch (err) {
     return { message: `Error: ${err.message}` };
   }
+});
+
+// ==========================================
+// UTILITY & MISC HANDLERS
+// ==========================================
+
+// Fetch and render README from a GitHub repository
+ipcMain.handle('fetch-addon-readme', async (_event, { repositoryUrl }) => {
+  try {
+    if (!repositoryUrl?.includes('github.com')) return { success: false };
+    const match = repositoryUrl.match(/github\.com\/([^\/\s]+)\/([^\/\s#?]+)/);
+    if (!match) return { success: false };
+
+    const [, owner, repo] = match;
+    const { marked } = require('marked');
+
+    // Try default branch candidates
+    for (const branch of ['master', 'main', 'develop']) {
+      try {
+        const res = await fetch(
+          `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/README.md`
+        );
+        if (!res.ok) continue;
+        const text = await res.text();
+        const html  = marked.parse(text);
+        return { success: true, html };
+      } catch {}
+    }
+    return { success: false, reason: 'README not found' };
+  } catch (error) {
+    console.error('fetch-addon-readme error:', error.message);
+    return { success: false };
+  }
+});
+
+// Update tags on an addon (admin only — RLS enforces)
+ipcMain.handle('update-addon-tags', async (_event, { addonId, tags }) => {
+  try {
+    const { error } = await supabase.from('addons').update({ tags }).eq('id', addonId);
+    if (error) throw error;
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// Auto-detect common Windower installation paths
+ipcMain.handle('auto-detect-windower', async () => {
+  const candidates = [
+    'C:\\Windower',
+    'C:\\Windower4',
+    path.join('C:\\', 'Program Files', 'Windower'),
+    path.join('C:\\', 'Program Files (x86)', 'Windower'),
+    path.join('C:\\', 'Games', 'Windower'),
+    path.join(process.env.USERPROFILE || '', 'Windower'),
+    path.join(process.env.USERPROFILE || '', 'Desktop', 'Windower'),
+  ];
+  for (const p of candidates) {
+    try {
+      if (fs.existsSync(p) && fs.existsSync(path.join(p, 'addons'))) return { found: true, path: p };
+    } catch {}
+  }
+  return { found: false };
+});
+
+// Get a user's public profile
+ipcMain.handle('get-user-profile', async (_event, userId) => {
+  try {
+    const { data, error } = await supabase
+      .from('profiles').select('id, username, avatar_url, bio').eq('id', userId).maybeSingle();
+    if (error) throw error;
+    return { success: true, data };
+  } catch (error) { return { success: false }; }
+});
+
+// Get reviews written by a user (with addon name)
+ipcMain.handle('get-user-reviews', async (_event, userId) => {
+  try {
+    const { data: reviews, error } = await supabase
+      .from('reviews').select('id, rating, review_text, created_at, addon_id')
+      .eq('user_id', userId).order('created_at', { ascending: false }).limit(20);
+    if (error) throw error;
+    if (!reviews?.length) return { success: true, data: [] };
+
+    const addonIds = [...new Set(reviews.map(r => r.addon_id))];
+    const { data: addons } = await supabase.from('addons').select('id, name').in('id', addonIds);
+    const am = Object.fromEntries((addons || []).map(a => [a.id, a]));
+    return { success: true, data: reviews.map(r => ({ ...r, addon: am[r.addon_id] || null })) };
+  } catch (error) { return { success: false, data: [] }; }
+});
+
+// Update own review
+ipcMain.handle('update-review', async (_event, { reviewId, rating, reviewText }) => {
+  try {
+    const { error } = await supabase.from('reviews')
+      .update({ rating: parseInt(rating), review_text: reviewText }).eq('id', reviewId);
+    if (error) throw error;
+    return { success: true };
+  } catch (error) { return { success: false, error: error.message }; }
+});
+
+// Delete own review
+ipcMain.handle('delete-review', async (_event, reviewId) => {
+  try {
+    const { error } = await supabase.from('reviews').delete().eq('id', reviewId);
+    if (error) throw error;
+    return { success: true };
+  } catch (error) { return { success: false, error: error.message }; }
+});
+
+// Admin: aggregate stats
+ipcMain.handle('get-admin-stats', async () => {
+  try {
+    const [users, addons, reviews, pending, reports] = await Promise.all([
+      supabase.from('profiles').select('*', { count: 'exact', head: true }),
+      supabase.from('addons').select('*', { count: 'exact', head: true }).eq('status', 'approved'),
+      supabase.from('reviews').select('*', { count: 'exact', head: true }),
+      supabase.from('addons').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
+      supabase.from('reports').select('*', { count: 'exact', head: true }),
+    ]);
+    return { success: true, users: users.count || 0, addons: addons.count || 0,
+      reviews: reviews.count || 0, pending: pending.count || 0, reports: reports.count || 0 };
+  } catch { return { success: false }; }
+});
+
+// Submit a report
+ipcMain.handle('submit-report', async (_event, { reporterId, targetType, targetId, reason }) => {
+  try {
+    const { error } = await supabase.from('reports')
+      .insert({ reporter_id: reporterId, target_type: targetType, target_id: targetId, reason });
+    if (error) throw error;
+    return { success: true };
+  } catch (error) { return { success: false, error: error.message }; }
 });
 
 // ==========================================
@@ -505,10 +690,11 @@ ipcMain.handle('remove-friend', async (event, friendshipId) => {
   }
 });
 
-// Bulk-insert addons (used by the GitHub importer)
+// Bulk-insert addons from GitHub importer (auto-approved — verified GitHub source)
 ipcMain.handle('bulk-submit-addons', async (event, addons) => {
   try {
-    const { error } = await supabase.from('addons').insert(addons);
+    const withStatus = addons.map(a => ({ ...a, status: 'approved' }));
+    const { error } = await supabase.from('addons').insert(withStatus);
     if (error) throw error;
     return { success: true };
   } catch (error) {
@@ -517,12 +703,19 @@ ipcMain.handle('bulk-submit-addons', async (event, addons) => {
   }
 });
 
-// Submit a new Addon
-ipcMain.handle('submit-addon', async (event, { name, author, description, folder_name, download_url }) => {
+// Submit a new Addon (goes to pending — requires moderation approval)
+ipcMain.handle('submit-addon', async (event, { name, author, description, folder_name, download_url, repository_url, screenshots, tags, submittedBy }) => {
   try {
     const { error } = await supabase
       .from('addons')
-      .insert({ name, author, description, folder_name, download_url });
+      .insert({
+        name, author, description, folder_name, download_url,
+        repository_url: repository_url || null,
+        screenshots:    screenshots    || [],
+        tags:           tags           || [],
+        status:         'pending',
+        submitted_by:   submittedBy,
+      });
     if (error) throw error;
     return { success: true };
   } catch (error) {
