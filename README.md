@@ -5,6 +5,15 @@ A community-built addon manager for **Final Fantasy XI Windower** — browse, in
 Built with **Electron** and **Supabase**.
 
 ---
+## Screenshots
+<img width="1202" height="751" alt="browse" src="https://github.com/user-attachments/assets/d7466d82-db53-4ff6-92ea-3653a1ea5c4a" />
+<img width="1202" height="751" alt="library" src="https://github.com/user-attachments/assets/d8d80ced-3ef3-48cf-8e50-c9fb667548f0" />
+<img width="1920" height="1032" alt="profile" src="https://github.com/user-attachments/assets/cec49892-7348-4cbf-b01f-f24236ba9a8f" />
+<img width="1920" height="1032" alt="friends" src="https://github.com/user-attachments/assets/09e78931-ae56-4e67-9edd-799342ddb6de" />
+<img width="1920" height="1032" alt="messages" src="https://github.com/user-attachments/assets/e1949d8f-3ff2-48a2-a24d-6a20f60ab522" />
+<img width="1920" height="1032" alt="addon-overview" src="https://github.com/user-attachments/assets/933a5896-c84c-42b5-b217-447f4c203016" />
+<img width="1920" height="1032" alt="addon-readme" src="https://github.com/user-attachments/assets/48c4f512-6113-40eb-a83b-be6f872edf0a" />
+
 
 ## Download
 
