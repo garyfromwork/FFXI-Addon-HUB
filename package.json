@@ -1,6 +1,6 @@
 {
   "name": "ffxi-addon-hub",
-  "version": "1.0.11",
+  "version": "1.0.12",
   "description": "FFXI Windower Addon Manager",
   "main": "main.js",
   "author": "Garyfromwork",
@@ -25,7 +25,8 @@
     "publish": {
       "provider": "github",
       "owner": "Garyfromwork",
-      "repo": "FFXI-Addon-HUB"
+      "repo": "FFXI-Addon-HUB",
+      "releaseType": "release"
     },
     "win": {
       "requestedExecutionLevel": "asInvoker",

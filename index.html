@@ -434,6 +434,71 @@
     .modal-head-sub { font-size: 13px; color: var(--text-sub); }
     .modal-body-pad { padding: 22px 24px; overflow-y: auto; }
 
+    /* ── Pack cards ── */
+    .pack-card {
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--r-lg); overflow: hidden; display: flex; flex-direction: column;
+      cursor: pointer; transition: border-color .14s, transform .14s, box-shadow .14s;
+    }
+    .pack-card:hover { border-color: var(--purple); transform: translateY(-2px); box-shadow: 0 6px 24px rgba(0,0,0,.4); }
+    .pack-banner { height: 72px; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; }
+    .pack-banner-glyph { font-size: 28px; opacity: .35; position: relative; z-index: 1; }
+    .pack-banner::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to bottom, transparent 30%, var(--bg-card)); }
+    .pack-card-body { padding: 12px 14px; flex: 1; display: flex; flex-direction: column; gap: 4px; }
+    .pack-name { font-size: 14px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .pack-author { font-size: 11px; color: var(--text-sub); }
+    .pack-desc { font-size: 12px; color: var(--text-sub); line-height: 1.5; flex: 1;
+      display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .pack-card-footer { display: flex; align-items: center; justify-content: space-between; padding: 8px 14px 12px; gap: 6px; }
+    .pack-count-badge {
+      font-size: 11px; font-weight: 600; color: var(--purple);
+      background: rgba(124,92,191,.12); border: 1px solid rgba(124,92,191,.3);
+      padding: 2px 8px; border-radius: 20px;
+    }
+
+    /* ── Pack detail modal ── */
+    .pack-modal { width: 720px; max-width: 95vw; max-height: 88vh; display: flex; flex-direction: column; }
+
+    /* ── Share dropdown ── */
+    .share-dropdown {
+      position: absolute; top: calc(100% + 6px); right: 0; z-index: 200;
+      background: var(--bg-card); border: 1px solid var(--border);
+      border-radius: var(--r-lg); width: 230px; max-height: 280px; overflow-y: auto;
+      box-shadow: 0 8px 32px rgba(0,0,0,.5);
+    }
+    .share-friend-row {
+      display: flex; align-items: center; gap: 10px; padding: 9px 14px;
+      cursor: pointer; transition: background .12s;
+    }
+    .share-friend-row:hover { background: var(--bg-elevated); }
+    .share-friend-name { font-size: 13px; font-weight: 500; flex: 1; min-width: 0;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    /* ── Pack addon rows ── */
+    .pack-addon-row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 11px 20px; border-bottom: 1px solid var(--border); transition: background .12s;
+    }
+    .pack-addon-row:hover { background: var(--bg-elevated); }
+    .pack-addon-row:last-child { border-bottom: none; }
+    .pack-addon-info { flex: 1; min-width: 0; }
+    .pack-addon-name { font-size: 13px; font-weight: 600; }
+    .pack-addon-meta { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
+    .badge-optional { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px;
+      color: var(--text-muted); background: var(--bg-elevated); border: 1px solid var(--border);
+      padding: 2px 7px; border-radius: 20px; flex-shrink: 0; }
+
+    /* ── Pack builder ── */
+    .pack-builder { width: 660px; max-width: 95vw; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; }
+    .pack-item-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 14px; background: var(--bg-elevated); border: 1px solid var(--border);
+      border-radius: var(--r); margin-bottom: 6px;
+    }
+    .pack-item-name { font-size: 13px; font-weight: 600; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .pack-item-author { font-size: 11px; color: var(--text-muted); }
+    .optional-toggle { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-sub); cursor: pointer; user-select: none; flex-shrink: 0; }
+
     /* ── Tag filter pills ── */
     .tag-filter-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }
     .tag-pill {
@@ -577,6 +642,9 @@
         <button class="nav-btn active" data-view="browse">
           <span class="nav-icon">◈</span> Browse
         </button>
+        <button class="nav-btn" data-view="packs">
+          <span class="nav-icon">⊞</span> Packs
+        </button>
         <button class="nav-btn" data-view="library">
           <span class="nav-icon">◉</span> My Library
         </button>
@@ -657,6 +725,20 @@
         </div>
       </div>
 
+      <!-- Packs View -->
+      <div id="view-packs" class="view">
+        <div class="vh">
+          <div>
+            <div class="vh-title">Addon Packs</div>
+            <div class="vh-sub">Curated bundles — install a whole setup in one click</div>
+          </div>
+          <button class="btn btn-outline hidden" id="btn-open-pack-builder">+ Create Pack</button>
+        </div>
+        <div class="addon-grid" id="packs-grid">
+          <div class="loading-state">Loading packs…</div>
+        </div>
+      </div>
+
       <!-- Library View -->
       <div id="view-library" class="view">
         <div class="vh">
@@ -693,13 +775,19 @@
       <!-- Moderation View -->
       <div id="view-moderation" class="view">
         <div class="vh">
-          <div>
-            <div class="vh-title">Moderation</div>
-            <div class="vh-sub">Review and approve community addon submissions</div>
-          </div>
-          <button class="btn btn-ghost" id="btn-refresh-mod">Refresh</button>
+          <div><div class="vh-title">Moderation</div></div>
+          <button class="btn btn-ghost btn-sm" id="btn-refresh-mod">↻ Refresh</button>
         </div>
-        <div id="mod-list"><div class="loading-state">Loading submissions…</div></div>
+        <div id="mod-stats"></div>
+        <div class="tab-row" style="margin-bottom:20px;">
+          <button class="tab-btn active" data-mod-tab="submissions" id="mod-tab-submissions">Pending Submissions</button>
+          <button class="tab-btn" data-mod-tab="reports" id="mod-tab-reports">
+            Reports
+            <span id="mod-reports-badge" class="hidden" style="background:var(--red);color:#fff;border-radius:20px;padding:1px 6px;font-size:10px;font-weight:700;margin-left:5px;"></span>
+          </button>
+        </div>
+        <div id="mod-submissions-content"><div class="loading-state">Loading…</div></div>
+        <div id="mod-reports-content" class="hidden"><div class="loading-state">Loading…</div></div>
       </div>
 
       <!-- Settings View -->
@@ -817,6 +905,7 @@
           </div>
           <div class="detail-actions">
             <span id="d-badge"></span>
+            <button class="btn btn-ghost btn-sm hidden" id="d-report-btn" style="color:var(--text-muted);">⚑ Report</button>
             <button class="btn btn-ghost btn-sm hidden" id="d-repo-btn">View Source ↗</button>
             <button class="btn btn-primary" id="d-install-btn">Install</button>
             <button class="btn btn-danger btn-sm hidden" id="d-uninstall-btn">Uninstall</button>
@@ -946,6 +1035,96 @@
       <button class="btn btn-primary btn-full" id="btn-do-submit">Submit for Review</button>
       <div class="fstatus" id="submit-status" style="margin-top:8px;text-align:center;"></div>
       </div><!-- end modal-body-pad -->
+    </div>
+  </div>
+
+  <!-- ── Pack Detail Modal ── -->
+  <div id="pack-overlay" class="overlay hidden">
+    <div class="modal pack-modal">
+      <div class="detail-head">
+        <div class="detail-title-row">
+          <div>
+            <div class="detail-name" id="pm-name">Loading…</div>
+            <div class="detail-meta">by <span id="pm-author"></span> &nbsp;·&nbsp; <span id="pm-count"></span></div>
+          </div>
+          <div class="detail-actions">
+            <div style="position:relative;">
+              <button class="btn btn-ghost btn-sm hidden" id="pm-share-btn">📤 Send to Friend</button>
+              <div id="pm-share-dropdown" class="share-dropdown hidden"></div>
+            </div>
+            <button class="btn btn-ghost btn-sm hidden" id="pm-report-btn" style="color:var(--text-muted);">⚑ Report</button>
+            <button class="btn btn-primary" id="pm-install-btn">Install All</button>
+            <button class="btn btn-danger btn-sm hidden" id="pm-delete-btn">Delete Pack</button>
+            <button class="modal-close-btn" id="close-pack-modal">✕</button>
+          </div>
+        </div>
+      </div>
+      <div class="detail-body">
+        <div class="modal-tabs">
+          <button class="ptab active" data-ptab="overview">Overview</button>
+          <button class="ptab" data-ptab="addons">Addons</button>
+        </div>
+        <div id="ptab-overview" class="tab-panel active">
+          <p id="pm-desc" style="color:var(--text-sub);line-height:1.75;margin-bottom:14px;"></p>
+          <div id="pm-tags" class="tag-chip-row"></div>
+        </div>
+        <div id="ptab-addons" class="tab-panel">
+          <div style="padding:12px 20px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);">
+            <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-sub);cursor:pointer;">
+              <input type="checkbox" id="pm-check-all" checked style="accent-color:var(--accent);">
+              Select all
+            </label>
+            <button class="btn btn-primary btn-sm" id="pm-install-selected">Install Selected</button>
+          </div>
+          <div id="pm-addons-list"></div>
+          <div class="fstatus" id="pm-install-status" style="padding:10px 20px;text-align:center;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Pack Builder Modal ── -->
+  <div id="pack-builder-overlay" class="overlay hidden">
+    <div class="modal pack-builder">
+      <div class="modal-head-row">
+        <div>
+          <div class="modal-head-title">Create an Addon Pack</div>
+          <div class="modal-head-sub">Bundle addons together for the community to discover and install</div>
+        </div>
+        <button class="modal-close-btn" id="close-pack-builder">✕</button>
+      </div>
+      <div style="overflow-y:auto;flex:1;display:flex;flex-direction:column;">
+        <div class="modal-body-pad" style="flex-shrink:0;border-bottom:1px solid var(--border);">
+          <div class="fg">
+            <label class="fl">Pack Name <span style="color:var(--red);">*</span></label>
+            <input type="text" id="pb-name" class="fi" placeholder="e.g. Combat Essentials, New Player Starter Kit…">
+          </div>
+          <div class="fg">
+            <label class="fl">Description</label>
+            <textarea id="pb-desc" class="ft" style="min-height:60px;" placeholder="What's in this pack and who is it for?"></textarea>
+          </div>
+          <div class="fg" style="margin-bottom:0;">
+            <label class="fl">Tags</label>
+            <div class="tag-check-grid" id="pb-tag-grid"></div>
+          </div>
+        </div>
+        <div style="padding:14px 20px;border-bottom:1px solid var(--border);flex-shrink:0;">
+          <div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--text-muted);margin-bottom:8px;">
+            Addons <span id="pb-item-count" style="color:var(--accent);">(0)</span>
+            <span style="color:var(--text-muted);font-weight:400;text-transform:none;"> — at least one required</span>
+          </div>
+          <div id="pb-selected-items" style="margin-bottom:8px;"></div>
+          <input type="text" id="pb-search" class="search-input" placeholder="Search addons to add to this pack…">
+          <div id="pb-search-results" style="margin-top:8px;max-height:190px;overflow-y:auto;"></div>
+        </div>
+        <div class="modal-body-pad" style="flex-shrink:0;">
+          <div style="font-size:12px;color:var(--text-muted);background:var(--bg-elevated);padding:10px 12px;border-radius:var(--r);margin-bottom:14px;">
+            ⚑ Packs go through the same review process as addon submissions.
+          </div>
+          <button class="btn btn-primary btn-full" id="btn-submit-pack">Submit Pack for Review</button>
+          <div class="fstatus" id="pb-status" style="margin-top:8px;text-align:center;"></div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -1087,6 +1266,7 @@
       document.getElementById(`view-${name}`)?.classList.add('active');
       document.querySelector(`[data-view="${name}"]`)?.classList.add('active');
       if (name === 'profile')    renderProfileView();
+      if (name === 'packs')      loadPacks();
       if (name === 'library')    renderLibrary();
       if (name === 'settings')   updateSettingsPathBar();
       if (name === 'friends')    onFriendsView();
@@ -1341,6 +1521,11 @@
       document.getElementById('d-badge').innerHTML = isInst
         ? '<span class="badge-installed">✓ Installed</span>'
         : isPending ? '<span class="badge-pending">⏳ Pending Review</span>' : '';
+
+      // Report button — visible to logged-in users who didn't submit this addon
+      const reportBtn = document.getElementById('d-report-btn');
+      reportBtn.classList.toggle('hidden', !S.user);
+      reportBtn.onclick = () => openReportModal('addon', addon.id, addon.name);
 
       // Repository link
       const repoBtn = document.getElementById('d-repo-btn');
@@ -1692,6 +1877,7 @@
       setAvatar(document.getElementById('sb-avatar-el'), S.profile?.avatar_url, displayName);
 
       document.getElementById('btn-open-submit')?.classList.remove('hidden');
+      document.getElementById('btn-open-pack-builder')?.classList.remove('hidden');
       // Generate RSA key pair on first login — runs silently, private key stays on this device
       window.electronAPI.ensureKeypair(res.id).catch(console.error);
 
@@ -1722,6 +1908,7 @@
       await window.electronAPI.logoutUser();
       S.user = null; S.profile = null; S.activePartner = null; S.friendsData = null; S.isAdmin = false;
       document.getElementById('btn-open-submit')?.classList.add('hidden');
+      document.getElementById('btn-open-pack-builder')?.classList.add('hidden');
       document.getElementById('friends-badge').classList.add('hidden');
       document.getElementById('nav-moderation').classList.add('hidden');
       document.getElementById('mod-badge').classList.add('hidden');
@@ -1950,11 +2137,12 @@
     // ────────────────────────────────────────────
     document.addEventListener('keydown', e => {
       if (e.key === 'Escape') {
-        ['detail-overlay','auth-overlay','submit-overlay','importer-overlay','user-profile-overlay','report-overlay']
+        ['detail-overlay','auth-overlay','submit-overlay','importer-overlay',
+         'user-profile-overlay','report-overlay','pack-overlay','pack-builder-overlay']
           .forEach(id => document.getElementById(id)?.classList.add('hidden'));
       }
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
-        const views = ['browse', 'library', 'profile', 'friends', 'messages'];
+        const views = ['browse', 'packs', 'library', 'profile', 'friends', 'messages'];
         const idx = parseInt(e.key) - 1;
         if (idx >= 0 && idx < views.length) { e.preventDefault(); switchView(views[idx]); }
       }
@@ -2155,10 +2343,13 @@
         }
 
         row.innerHTML = `
-          <div class="friend-av" style="width:36px;height:36px;font-size:14px;${url ? `background-image:url('${esc(url)}')` : ''}">${url ? '' : esc(name[0].toUpperCase())}</div>
-          <div style="flex:1;font-weight:600;font-size:13px;">${esc(name)}</div>
+          <div class="friend-av js-profile" style="width:36px;height:36px;font-size:14px;cursor:pointer;${url ? `background-image:url('${esc(url)}')` : ''}">${url ? '' : esc(name[0].toUpperCase())}</div>
+          <div class="js-profile" style="flex:1;font-weight:600;font-size:13px;cursor:pointer;" title="View profile">${esc(name)}</div>
           ${actionHTML}
         `;
+        row.querySelectorAll('.js-profile').forEach(el => {
+          el.addEventListener('click', e => { e.stopPropagation(); openUserProfile(user.id); });
+        });
         resultsEl.appendChild(row);
       }
 
@@ -2191,51 +2382,56 @@
     // ────────────────────────────────────────────
     // MODERATION
     // ────────────────────────────────────────────
-    async function renderModerationView() {
-      const list = document.getElementById('mod-list');
-      list.innerHTML = '<div class="loading-state">Loading…</div>';
+    let activeModTab = 'submissions';
 
-      // Load admin stats in parallel with submissions
+    function switchModTab(name) {
+      activeModTab = name;
+      document.querySelectorAll('[data-mod-tab]').forEach(t => t.classList.toggle('active', t.dataset.modTab === name));
+      document.getElementById('mod-submissions-content').classList.toggle('hidden', name !== 'submissions');
+      document.getElementById('mod-reports-content').classList.toggle('hidden', name !== 'reports');
+      if (name === 'submissions') renderModSubmissions();
+      if (name === 'reports')     renderModReports();
+    }
+    document.querySelectorAll('[data-mod-tab]').forEach(t => t.addEventListener('click', () => switchModTab(t.dataset.modTab)));
+
+    async function renderModerationView() {
+      // Stats bar (always visible)
       window.electronAPI.getAdminStats().then(stats => {
         if (!stats.success) return;
-        const statsHtml = `<div class="stat-grid">
+        document.getElementById('mod-stats').innerHTML = `<div class="stat-grid" style="margin-bottom:16px;">
           <div class="stat-card"><div class="stat-number">${stats.users}</div><div class="stat-label">Users</div></div>
           <div class="stat-card"><div class="stat-number">${stats.addons}</div><div class="stat-label">Addons</div></div>
           <div class="stat-card"><div class="stat-number">${stats.reviews}</div><div class="stat-label">Reviews</div></div>
           <div class="stat-card"><div class="stat-number" style="color:var(--accent);">${stats.pending}</div><div class="stat-label">Pending</div></div>
           <div class="stat-card"><div class="stat-number" style="color:var(--red);">${stats.reports}</div><div class="stat-label">Reports</div></div>
         </div>`;
-        list.insertAdjacentHTML('afterbegin', statsHtml);
       });
+      switchModTab(activeModTab);
+    }
 
+    async function renderModSubmissions() {
+      const el = document.getElementById('mod-submissions-content');
+      el.innerHTML = '<div class="loading-state">Loading submissions…</div>';
       const res = await window.electronAPI.getPendingSubmissions();
-      if (!res.success) { list.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠</div>${esc(res.error)}</div>`; return; }
+      if (!res.success) { el.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠</div>${esc(res.error)}</div>`; return; }
 
       const badge = document.getElementById('mod-badge');
-      if (res.data.length > 0) { badge.textContent = res.data.length; badge.classList.remove('hidden'); }
+      if (res.data.length) { badge.textContent = res.data.length; badge.classList.remove('hidden'); }
       else badge.classList.add('hidden');
 
-      if (!res.data.length) {
-        list.innerHTML = '<div class="empty-state"><div class="empty-icon">⚑</div>No pending submissions — all caught up!</div>';
-        return;
-      }
+      if (!res.data.length) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">⚑</div>No pending submissions — all caught up!</div>'; return; }
 
-      list.innerHTML = '';
+      el.innerHTML = '';
       for (const addon of res.data) {
         const card = document.createElement('div');
         card.className = 'mod-card';
         const submitter = addon.submitter?.username || 'Unknown';
         const shots = Array.isArray(addon.screenshots) ? addon.screenshots.filter(Boolean) : [];
-
         card.innerHTML = `
           <div class="mod-card-head">
             <div>
               <div class="mod-card-title">${esc(addon.name)}</div>
-              <div class="mod-card-meta">
-                by ${esc(addon.author)} &nbsp;·&nbsp;
-                Submitted by <strong>${esc(submitter)}</strong> &nbsp;·&nbsp;
-                ${new Date(addon.created_at).toLocaleDateString()}
-              </div>
+              <div class="mod-card-meta">by ${esc(addon.author)} &nbsp;·&nbsp; Submitted by <strong>${esc(submitter)}</strong> &nbsp;·&nbsp; ${new Date(addon.created_at).toLocaleDateString()}</div>
             </div>
             <div class="mod-card-actions">
               <button class="btn btn-success btn-sm js-approve" data-id="${esc(addon.id)}">✓ Approve</button>
@@ -2247,30 +2443,100 @@
             ${addon.repository_url ? `<a class="mod-link" data-ext="${esc(addon.repository_url)}">↗ View Repository</a>` : ''}
             <span style="color:var(--text-muted);">Folder: <code>${esc(addon.folder_name)}</code></span>
           </div>
-          ${shots.length ? `<div style="display:flex;gap:8px;margin-top:10px;overflow-x:auto;">
-            ${shots.map(u => `<img src="${esc(u)}" style="height:80px;border-radius:6px;border:1px solid var(--border);">`).join('')}
-          </div>` : ''}
+          ${shots.length ? `<div style="display:flex;gap:8px;margin-top:10px;overflow-x:auto;">${shots.map(u=>`<img src="${esc(u)}" style="height:80px;border-radius:6px;border:1px solid var(--border);">`).join('')}</div>` : ''}
         `;
-
-        card.querySelectorAll('[data-ext]').forEach(el => {
-          el.style.cursor = 'pointer';
-          el.addEventListener('click', () => window.electronAPI.openExternal(el.dataset.ext));
+        card.querySelectorAll('[data-ext]').forEach(el2 => {
+          el2.style.cursor = 'pointer';
+          el2.addEventListener('click', () => window.electronAPI.openExternal(el2.dataset.ext));
         });
         card.querySelector('.js-approve').addEventListener('click', async (e) => {
           e.target.disabled = true;
           const r = await window.electronAPI.moderateAddon({ addonId: addon.id, status: 'approved' });
-          if (r.success) { toast(`"${addon.name}" approved!`); renderModerationView(); loadAddons(); }
+          if (r.success) { toast(`"${addon.name}" approved!`); renderModSubmissions(); loadAddons(); }
           else { toast(r.error, true); e.target.disabled = false; }
         });
         card.querySelector('.js-reject').addEventListener('click', async (e) => {
           if (!confirm(`Reject "${addon.name}"? This will delete the submission.`)) return;
           e.target.disabled = true;
           const r = await window.electronAPI.moderateAddon({ addonId: addon.id, status: 'rejected' });
-          if (r.success) { toast(`"${addon.name}" rejected.`); renderModerationView(); }
+          if (r.success) { toast(`"${addon.name}" rejected.`); renderModSubmissions(); }
           else { toast(r.error, true); e.target.disabled = false; }
         });
+        el.appendChild(card);
+      }
+    }
 
-        list.appendChild(card);
+    async function renderModReports() {
+      const el = document.getElementById('mod-reports-content');
+      el.innerHTML = '<div class="loading-state">Loading reports…</div>';
+      const res = await window.electronAPI.getReports();
+      if (!res.success) { el.innerHTML = `<div class="empty-state"><div class="empty-icon">⚠</div>${esc(res.error || 'Failed to load.')}</div>`; return; }
+
+      // Update badge on the Reports tab
+      const rb = document.getElementById('mod-reports-badge');
+      if (res.data.length) { rb.textContent = res.data.length; rb.classList.remove('hidden'); }
+      else rb.classList.add('hidden');
+
+      if (!res.data.length) { el.innerHTML = '<div class="empty-state"><div class="empty-icon">✓</div>No open reports — inbox zero!</div>'; return; }
+
+      el.innerHTML = '';
+      for (const report of res.data) {
+        const card = document.createElement('div');
+        card.className = 'mod-card';
+
+        const typeColors = { addon: 'var(--accent)', pack: 'var(--purple)', review: 'var(--green)', user: 'var(--red)' };
+        const typeColor  = typeColors[report.target_type] || 'var(--text-muted)';
+        const targetName = report.target?.name || report.target?.username || report.target?.review_text?.slice(0, 60) || report.target_id;
+        const reporter   = report.reporter?.username || 'Unknown';
+        const date       = new Date(report.created_at).toLocaleDateString();
+
+        // Build action buttons based on target type
+        let actionBtns = `<button class="btn btn-ghost btn-sm js-dismiss">Dismiss</button>`;
+        if (report.target_type === 'addon')  actionBtns += `<button class="btn btn-danger btn-sm js-hide-addon">Remove from Browse</button>`;
+        if (report.target_type === 'pack')   actionBtns += `<button class="btn btn-danger btn-sm js-hide-pack">Remove from Browse</button>`;
+        if (report.target_type === 'review') actionBtns += `<button class="btn btn-danger btn-sm js-del-review">Delete Review</button>`;
+
+        card.innerHTML = `
+          <div class="mod-card-head">
+            <div>
+              <div class="mod-card-title" style="display:flex;align-items:center;gap:8px;">
+                <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:${typeColor};background:${typeColor}1a;border:1px solid ${typeColor}44;padding:2px 8px;border-radius:20px;">${esc(report.target_type)}</span>
+                ${esc(targetName || '—')}
+              </div>
+              <div class="mod-card-meta">Reported by <strong>${esc(reporter)}</strong> &nbsp;·&nbsp; ${date}</div>
+            </div>
+            <div class="mod-card-actions">${actionBtns}</div>
+          </div>
+          <div class="mod-card-desc" style="color:var(--text-sub);">
+            <strong>Reason:</strong> ${esc(report.reason || 'No reason provided.')}
+          </div>
+          ${report.target?.review_text ? `<div style="margin-top:8px;font-size:12px;color:var(--text-muted);font-style:italic;padding:8px 10px;background:var(--bg-elevated);border-radius:var(--r);">"${esc(report.target.review_text)}"</div>` : ''}
+        `;
+
+        async function resolveWith(action) {
+          const res2 = await window.electronAPI.resolveReport({
+            reportId: report.id, status: 'resolved', action,
+            targetType: report.target_type, targetId: report.target_id,
+          });
+          if (res2.success) { toast('Report resolved.'); renderModReports(); renderModerationView(); }
+          else toast(res2.error || 'Failed.', true);
+        }
+
+        card.querySelector('.js-dismiss')?.addEventListener('click', () => resolveWith('dismissed'));
+        card.querySelector('.js-hide-addon')?.addEventListener('click', async () => {
+          if (!confirm(`Remove "${targetName}" from Browse? It will be hidden but not deleted.`)) return;
+          await resolveWith('hide_addon'); loadAddons();
+        });
+        card.querySelector('.js-hide-pack')?.addEventListener('click', async () => {
+          if (!confirm(`Remove "${targetName}" from Browse? It will be hidden but not deleted.`)) return;
+          await resolveWith('hide_pack'); loadPacks();
+        });
+        card.querySelector('.js-del-review')?.addEventListener('click', async () => {
+          if (!confirm('Permanently delete this review?')) return;
+          await resolveWith('delete_review');
+        });
+
+        el.appendChild(card);
       }
     }
 
@@ -2941,6 +3207,383 @@
     }
 
     // ────────────────────────────────────────────
+    // ADDON PACKS
+    // ────────────────────────────────────────────
+    S.openPack = null;
+    let packBuilderItems = [];
+
+    const PACK_PALETTES = [
+      'linear-gradient(135deg,#0a0a30,#1a0a35)',
+      'linear-gradient(135deg,#0a1a10,#1a1a0a)',
+      'linear-gradient(135deg,#1a0a0a,#0a0a1a)',
+      'linear-gradient(135deg,#0a1020,#200a15)',
+    ];
+
+    // ── Packs grid ──
+    async function loadPacks() {
+      const grid = document.getElementById('packs-grid');
+      grid.innerHTML = '<div class="loading-state">Loading packs…</div>';
+      const res = await window.electronAPI.getPacks();
+      if (!res.success || !res.data.length) {
+        grid.innerHTML = '<div class="empty-state"><div class="empty-icon">⊞</div>No packs yet — sign in and create the first one!</div>';
+        return;
+      }
+      grid.innerHTML = '';
+      res.data.forEach(pack => grid.appendChild(buildPackCard(pack)));
+    }
+
+    function buildPackCard(pack) {
+      const card = document.createElement('div');
+      card.className = 'pack-card';
+      const pal    = PACK_PALETTES[pack.name.charCodeAt(0) % PACK_PALETTES.length];
+      const tags   = Array.isArray(pack.tags) ? pack.tags.slice(0, 2) : [];
+      const author = pack.author?.username || 'Unknown';
+
+      card.innerHTML = `
+        <div class="pack-banner" style="background:${pal}">
+          <span class="pack-banner-glyph">⊞</span>
+        </div>
+        <div class="pack-card-body">
+          <div class="pack-name">${esc(pack.name)}</div>
+          <div class="pack-author">by ${esc(author)}</div>
+          <div class="pack-desc">${esc(pack.description || 'No description.')}</div>
+          ${tags.length ? `<div class="tag-chip-row">${tags.map(t=>`<span class="tag-chip">${esc(t)}</span>`).join('')}</div>` : ''}
+        </div>
+        <div class="pack-card-footer">
+          <div style="display:flex;gap:6px;align-items:center;">
+            <span class="pack-count-badge">⊞ ${pack.addon_count} addon${pack.addon_count !== 1 ? 's' : ''}</span>
+            ${pack.status === 'pending' ? '<span class="badge-pending">⏳ Pending</span>' : ''}
+          </div>
+          <button class="btn btn-ghost btn-sm js-view-pack">View Pack</button>
+        </div>
+      `;
+      card.addEventListener('click', () => openPackDetail(pack.id));
+      card.querySelector('.js-view-pack').addEventListener('click', e => { e.stopPropagation(); openPackDetail(pack.id); });
+      return card;
+    }
+
+    // ── Pack detail ──
+    async function openPackDetail(packId) {
+      document.getElementById('pm-name').textContent = 'Loading…';
+      document.getElementById('pm-author').textContent = '';
+      document.getElementById('pm-count').textContent = '';
+      document.getElementById('pm-desc').textContent = '';
+      document.getElementById('pm-tags').innerHTML = '';
+      document.getElementById('pm-addons-list').innerHTML = '<div class="loading-state">Loading…</div>';
+      document.getElementById('pm-install-status').textContent = '';
+      switchPackTab('overview');
+      document.getElementById('pack-overlay').classList.remove('hidden');
+
+      const res = await window.electronAPI.getPackDetail(packId);
+      if (!res.success) { document.getElementById('pm-name').textContent = 'Failed to load.'; return; }
+      const pack = res.data;
+      S.openPack = pack;
+
+      document.getElementById('pm-name').textContent = pack.name;
+      document.getElementById('pm-author').textContent = pack.author?.username || 'Unknown';
+      document.getElementById('pm-count').textContent = `${pack.items.length} addon${pack.items.length !== 1 ? 's' : ''}`;
+      if (pack.description) document.getElementById('pm-desc').textContent = pack.description;
+      const tags = Array.isArray(pack.tags) ? pack.tags : [];
+      document.getElementById('pm-tags').innerHTML = tags.map(t => `<span class="tag-chip">${esc(t)}</span>`).join('');
+
+      document.getElementById('pm-delete-btn').classList.toggle('hidden', !(S.user && pack.author_id === S.user.id));
+
+      // Share button — visible when logged in and has friends
+      const shareBtn = document.getElementById('pm-share-btn');
+      shareBtn.classList.toggle('hidden', !S.user);
+      document.getElementById('pm-share-dropdown').classList.add('hidden');
+
+      // Report button — visible to logged-in users who didn't create this pack
+      const packReportBtn = document.getElementById('pm-report-btn');
+      packReportBtn.classList.toggle('hidden', !S.user || pack.author_id === S.user.id);
+      packReportBtn.onclick = () => openReportModal('pack', pack.id, pack.name);
+      const installBtn = document.getElementById('pm-install-btn');
+      installBtn.disabled = !S.path;
+      installBtn.title    = S.path ? '' : 'Set your Windower path first';
+
+      renderPackAddonList(pack.items);
+    }
+
+    function renderPackAddonList(items) {
+      const list = document.getElementById('pm-addons-list');
+      if (!items.length) { list.innerHTML = '<div class="empty-state">No addons in this pack.</div>'; return; }
+      list.innerHTML = items.map(item => {
+        const a   = item.addon;
+        const avg = a.reviews?.length ? (a.reviews.reduce((s,r)=>s+r.rating,0)/a.reviews.length).toFixed(1) : null;
+        return `
+          <div class="pack-addon-row" data-addon-id="${esc(item.addon_id)}">
+            <input type="checkbox" ${item.optional ? '' : 'checked'} style="accent-color:var(--accent);width:15px;height:15px;flex-shrink:0;cursor:pointer;">
+            <div class="pack-addon-info">
+              <div class="pack-addon-name">${esc(a.name)}</div>
+              <div class="pack-addon-meta">by ${esc(a.author||'')}${avg ? ` · ★ ${avg}` : ''}</div>
+            </div>
+            ${item.optional ? '<span class="badge-optional">Optional</span>' : ''}
+          </div>`;
+      }).join('');
+    }
+
+    function switchPackTab(name) {
+      document.querySelectorAll('.ptab').forEach(t => t.classList.toggle('active', t.dataset.ptab === name));
+      document.getElementById('ptab-overview').classList.toggle('active', name === 'overview');
+      document.getElementById('ptab-addons').classList.toggle('active', name === 'addons');
+    }
+    document.querySelectorAll('.ptab').forEach(t => t.addEventListener('click', () => switchPackTab(t.dataset.ptab)));
+
+    document.getElementById('pm-check-all').addEventListener('change', e => {
+      document.getElementById('pm-addons-list').querySelectorAll('input[type="checkbox"]')
+        .forEach(cb => { cb.checked = e.target.checked; });
+    });
+
+    document.getElementById('close-pack-modal').addEventListener('click', () => {
+      document.getElementById('pack-overlay').classList.add('hidden');
+      S.openPack = null;
+    });
+
+    document.getElementById('pm-install-btn').addEventListener('click', () => {
+      if (!S.openPack) return;
+      document.getElementById('pm-addons-list').querySelectorAll('input[type="checkbox"]').forEach(cb => { cb.checked = true; });
+      switchPackTab('addons');
+      handlePackInstall();
+    });
+
+    document.getElementById('pm-install-selected').addEventListener('click', handlePackInstall);
+
+    async function handlePackInstall() {
+      if (!S.openPack || !S.path) return;
+      const rows = [...document.getElementById('pm-addons-list').querySelectorAll('.pack-addon-row')];
+      const toInstall = rows
+        .filter(r => r.querySelector('input[type="checkbox"]').checked)
+        .map(r => S.openPack.items.find(i => i.addon_id === r.dataset.addonId))
+        .filter(Boolean);
+
+      if (!toInstall.length) { toast('No addons selected.', true); return; }
+
+      const btn1 = document.getElementById('pm-install-btn');
+      const btn2 = document.getElementById('pm-install-selected');
+      const stat = document.getElementById('pm-install-status');
+      btn1.disabled = true; btn2.disabled = true;
+
+      let installed = 0, failed = 0;
+      for (const item of toInstall) {
+        stat.textContent = `Installing ${item.addon.name}… (${installed + failed + 1}/${toInstall.length})`;
+        stat.className = 'fstatus';
+        const res = await window.electronAPI.installAddon({
+          downloadUrl: item.addon.download_url,
+          windowerPath: S.path,
+          addonName: item.addon.folder_name,
+        });
+        if (res.success) installed++; else failed++;
+      }
+
+      stat.textContent = `Done — ${installed} installed${failed ? `, ${failed} failed` : ''}.`;
+      stat.className = failed > 0 ? 'fstatus err' : 'fstatus ok';
+      btn1.disabled = false; btn2.disabled = false;
+      if (installed > 0) { toast(`${installed} addon${installed !== 1 ? 's' : ''} installed!`); loadAddons(); }
+    }
+
+    // ── Share pack with a friend ──
+    document.getElementById('pm-share-btn').addEventListener('click', e => {
+      e.stopPropagation();
+      const dd = document.getElementById('pm-share-dropdown');
+      const isOpen = !dd.classList.contains('hidden');
+      dd.classList.toggle('hidden', isOpen);
+      if (!isOpen) populateShareDropdown();
+    });
+
+    // Close the dropdown when clicking anywhere else
+    document.addEventListener('click', e => {
+      if (!e.target.closest('#pm-share-btn') && !e.target.closest('#pm-share-dropdown')) {
+        document.getElementById('pm-share-dropdown')?.classList.add('hidden');
+      }
+    });
+
+    function populateShareDropdown() {
+      const dd      = document.getElementById('pm-share-dropdown');
+      const friends = S.friendsData?.friends || [];
+
+      if (!friends.length) {
+        dd.innerHTML = `<div style="padding:16px 14px;font-size:12px;color:var(--text-muted);text-align:center;">
+          No friends yet.<br>Add friends to share packs.
+        </div>`;
+        return;
+      }
+
+      dd.innerHTML = `<div style="padding:8px 14px 4px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--text-muted);">Send to…</div>`;
+
+      friends.forEach(f => {
+        const name = f.profile?.username || 'Unknown';
+        const url  = f.profile?.avatar_url || '';
+        const row  = document.createElement('div');
+        row.className = 'share-friend-row';
+        row.innerHTML = `
+          <div class="conv-av" style="width:30px;height:30px;font-size:12px;${url ? `background-image:url('${esc(url)}')` : ''}">${url ? '' : esc(name[0].toUpperCase())}</div>
+          <div class="share-friend-name">${esc(name)}</div>
+          <button class="btn btn-primary btn-sm">Send</button>
+        `;
+        row.querySelector('button').addEventListener('click', async ev => {
+          ev.stopPropagation();
+          dd.classList.add('hidden');
+          await sharePackWithFriend(f.profile);
+        });
+        dd.appendChild(row);
+      });
+    }
+
+    async function sharePackWithFriend(friend) {
+      if (!S.openPack || !S.user || !friend) return;
+      const { name, description } = S.openPack;
+      const msg = `📦 Pack: ${name}${description ? `\n${description}` : ''}\n\nFind it in the ⊞ Packs tab!`;
+
+      const res = await window.electronAPI.sendMessage({
+        senderId: S.user.id,
+        receiverId: friend.id,
+        content: msg,
+      });
+
+      if (res.success) toast(`Pack shared with ${friend.username || 'friend'}!`);
+      else toast('Failed to send — make sure your friend has signed in at least once.', true);
+    }
+
+    document.getElementById('pm-delete-btn').addEventListener('click', async () => {
+      if (!S.openPack) return;
+      if (!confirm(`Delete "${S.openPack.name}"? This cannot be undone.`)) return;
+      const res = await window.electronAPI.deletePack(S.openPack.id);
+      if (res.success) {
+        document.getElementById('pack-overlay').classList.add('hidden');
+        S.openPack = null;
+        toast('Pack deleted.');
+        loadPacks();
+      } else { toast(res.error || 'Failed to delete.', true); }
+    });
+
+    // ── Pack builder ──
+    document.getElementById('btn-open-pack-builder').addEventListener('click', openPackBuilder);
+    document.getElementById('close-pack-builder').addEventListener('click', () =>
+      document.getElementById('pack-builder-overlay').classList.add('hidden'));
+
+    function openPackBuilder() {
+      if (!S.user) { document.getElementById('auth-overlay').classList.remove('hidden'); return; }
+      packBuilderItems = [];
+      document.getElementById('pb-name').value = '';
+      document.getElementById('pb-desc').value = '';
+      document.getElementById('pb-search').value = '';
+      document.getElementById('pb-search-results').innerHTML = '';
+      document.getElementById('pb-status').textContent = '';
+      buildTagPicker('pb-tag-grid', []);
+      renderPackBuilderItems();
+      document.getElementById('pack-builder-overlay').classList.remove('hidden');
+      document.getElementById('pb-name').focus();
+    }
+
+    function renderPackBuilderItems() {
+      const el    = document.getElementById('pb-selected-items');
+      const count = document.getElementById('pb-item-count');
+      count.textContent = `(${packBuilderItems.length})`;
+      if (!packBuilderItems.length) {
+        el.innerHTML = '<div style="font-size:12px;color:var(--text-muted);padding:6px 0 2px;">No addons added yet.</div>';
+        return;
+      }
+      el.innerHTML = '';
+      packBuilderItems.forEach((item, idx) => {
+        const row = document.createElement('div');
+        row.className = 'pack-item-row';
+        row.innerHTML = `
+          <div style="flex:1;min-width:0;">
+            <div class="pack-item-name">${esc(item.name)}</div>
+            <div class="pack-item-author">by ${esc(item.author || '')}</div>
+          </div>
+          <label class="optional-toggle">
+            <input type="checkbox" ${item.optional ? 'checked' : ''} style="accent-color:var(--accent);">
+            Optional
+          </label>
+          <button class="btn btn-ghost btn-sm" style="color:var(--red);flex-shrink:0;" data-remove="${idx}">✗</button>
+        `;
+        row.querySelector('input').addEventListener('change', e => { packBuilderItems[idx].optional = e.target.checked; });
+        row.querySelector('[data-remove]').addEventListener('click', () => {
+          packBuilderItems.splice(idx, 1);
+          renderPackBuilderItems();
+          const q = document.getElementById('pb-search').value.trim();
+          if (q) renderPackBuilderSearch(q);
+        });
+        el.appendChild(row);
+      });
+    }
+
+    let pbSearchDebounce;
+    document.getElementById('pb-search').addEventListener('input', e => {
+      clearTimeout(pbSearchDebounce);
+      const q = e.target.value.trim();
+      if (!q) { document.getElementById('pb-search-results').innerHTML = ''; return; }
+      pbSearchDebounce = setTimeout(() => renderPackBuilderSearch(q), 200);
+    });
+
+    function renderPackBuilderSearch(q) {
+      const lc = q.toLowerCase();
+      const results = S.addons
+        .filter(a => a.status !== 'pending' &&
+          (a.name.toLowerCase().includes(lc) || (a.author||'').toLowerCase().includes(lc)))
+        .slice(0, 8);
+      const el = document.getElementById('pb-search-results');
+      if (!results.length) { el.innerHTML = '<div style="font-size:12px;color:var(--text-muted);padding:6px 0;">No addons found.</div>'; return; }
+      el.innerHTML = '';
+      results.forEach(addon => {
+        const added = packBuilderItems.some(i => i.addonId === addon.id);
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--r);transition:background .12s;cursor:pointer;';
+        row.innerHTML = `
+          <div style="flex:1;min-width:0;">
+            <div style="font-size:13px;font-weight:600;">${esc(addon.name)}</div>
+            <div style="font-size:11px;color:var(--text-muted);">by ${esc(addon.author||'')}</div>
+          </div>
+          <button class="btn ${added ? 'btn-ghost' : 'btn-primary'} btn-sm" ${added ? 'disabled' : ''}>
+            ${added ? '✓ Added' : '+ Add'}
+          </button>
+        `;
+        if (!added) {
+          row.addEventListener('mouseover', () => { row.style.background = 'var(--bg-elevated)'; });
+          row.addEventListener('mouseout',  () => { row.style.background = ''; });
+          row.querySelector('button').addEventListener('click', () => {
+            packBuilderItems.push({ addonId: addon.id, name: addon.name, author: addon.author, optional: false });
+            renderPackBuilderItems();
+            renderPackBuilderSearch(document.getElementById('pb-search').value.trim());
+          });
+        }
+        el.appendChild(row);
+      });
+    }
+
+    document.getElementById('btn-submit-pack').addEventListener('click', async () => {
+      const name = document.getElementById('pb-name').value.trim();
+      const description = document.getElementById('pb-desc').value.trim();
+      const tags = getSelectedTags('pb-tag-grid');
+      const stat = document.getElementById('pb-status');
+      const btn  = document.getElementById('btn-submit-pack');
+
+      if (!name) { stat.textContent = 'Pack name is required.'; stat.className = 'fstatus err'; return; }
+      if (!packBuilderItems.length) { stat.textContent = 'Add at least one addon to the pack.'; stat.className = 'fstatus err'; return; }
+
+      btn.disabled = true;
+      stat.textContent = 'Submitting…'; stat.className = 'fstatus';
+
+      const res = await window.electronAPI.createPack({
+        name, description, tags, authorId: S.user.id,
+        items: packBuilderItems.map(i => ({ addonId: i.addonId, optional: i.optional })),
+      });
+
+      if (res.success) {
+        stat.textContent = '✓ Pack submitted for review!'; stat.className = 'fstatus ok';
+        btn.disabled = false;
+        setTimeout(() => {
+          document.getElementById('pack-builder-overlay').classList.add('hidden');
+          loadPacks();
+        }, 1800);
+      } else {
+        stat.textContent = res.error || 'Submission failed.'; stat.className = 'fstatus err';
+        btn.disabled = false;
+      }
+    });
+
+    // ────────────────────────────────────────────
     // TAG PICKER HELPERS
     // ────────────────────────────────────────────
     const TAGS = [
@@ -2988,7 +3631,7 @@
       if (!userId) return;
       const avEl = document.getElementById('up-avatar');
       document.getElementById('up-name').textContent = '…';
-      document.getElementById('up-bio').textContent = '';
+      document.getElementById('up-bio').innerHTML = '';
       document.getElementById('up-stats').textContent = '';
       document.getElementById('up-actions').innerHTML = '';
       document.getElementById('up-reviews').innerHTML = '<div class="loading-state">Loading…</div>';
@@ -3007,7 +3650,15 @@
       document.getElementById('up-name').textContent = name;
       if (p.avatar_url) { avEl.style.backgroundImage = `url('${p.avatar_url}')`; avEl.textContent = ''; }
       else { avEl.style.backgroundImage = 'none'; avEl.textContent = name[0].toUpperCase(); }
-      if (p.bio) document.getElementById('up-bio').textContent = p.bio;
+      const bioEl = document.getElementById('up-bio');
+      if (p.bio) {
+        bioEl.innerHTML = `
+          <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--text-muted);margin-bottom:6px;">About</div>
+          <div style="font-size:13px;color:var(--text-sub);line-height:1.65;">${esc(p.bio)}</div>
+        `;
+      } else {
+        bioEl.innerHTML = `<div style="font-size:12px;color:var(--text-muted);font-style:italic;">This user hasn't written a bio yet.</div>`;
+      }
 
       const reviews = reviewsRes.data || [];
       document.getElementById('up-stats').textContent = `${reviews.length} review${reviews.length !== 1 ? 's' : ''}`;

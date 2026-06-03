@@ -44,7 +44,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   deleteReview:        (id)     => ipcRenderer.invoke('delete-review', id),
   getAdminStats:       ()       => ipcRenderer.invoke('get-admin-stats'),
   submitReport:        (data)   => ipcRenderer.invoke('submit-report', data),
+  getReports:          ()       => ipcRenderer.invoke('get-reports'),
+  resolveReport:       (data)   => ipcRenderer.invoke('resolve-report', data),
   updateAddonTags:     (data)   => ipcRenderer.invoke('update-addon-tags', data),
   fetchAddonReadme:    (data)   => ipcRenderer.invoke('fetch-addon-readme', data),
   uploadAddonZip:      (userId) => ipcRenderer.invoke('upload-addon-zip', userId),
+  getPacks:            ()       => ipcRenderer.invoke('get-packs'),
+  getPackDetail:       (id)     => ipcRenderer.invoke('get-pack-detail', id),
+  createPack:          (data)   => ipcRenderer.invoke('create-pack', data),
+  deletePack:          (id)     => ipcRenderer.invoke('delete-pack', id),
 });

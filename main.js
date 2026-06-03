@@ -185,46 +185,29 @@ function sendUpdateStatus(payload) {
 }
 
 function initAutoUpdater() {
-  // Skip entirely in development — checkForUpdates always fails outside a packaged app
   if (!app.isPackaged) return;
 
-  // Route updater messages to electron-log if available; fall back to console
-  // so a missing module can never prevent the update check from running.
-  let log = console;
+  // Wire electron-log for internal electron-updater diagnostics.
+  // electron-log v5 changed its config API, so we only set the logger reference
+  // and skip the level assignment to avoid a throw that would break the handlers.
   try {
-    log = require('electron-log');
-    log.transports.file.level = 'info';
+    const log = require('electron-log');
     autoUpdater.logger = log;
-    log.info('Auto-updater initialising. App version:', app.getVersion());
   } catch {
     autoUpdater.logger = console;
   }
 
-  autoUpdater.autoDownload    = true;   // download as soon as update is found
-  autoUpdater.allowPrerelease = false;  // only full releases, not pre-releases
+  autoUpdater.autoDownload    = true;
+  autoUpdater.allowPrerelease = false;
 
-  autoUpdater.on('checking-for-update', () => {
-    log.info('Checking for update…');
-    sendUpdateStatus({ type: 'checking' });
-  });
-
-  autoUpdater.on('update-available', (info) => {
-    log.info('Update available:', info.version);
-    sendUpdateStatus({ type: 'available', version: info.version });
-  });
-
-  autoUpdater.on('update-not-available', (info) => {
-    log.info('No update available. Current version is latest:', info.version);
-    sendUpdateStatus({ type: 'up-to-date' });
-  });
-
-  autoUpdater.on('download-progress', (progress) => {
-    log.info(`Download progress: ${Math.round(progress.percent)}%`);
-    sendUpdateStatus({ type: 'downloading', percent: Math.round(progress.percent) });
-  });
+  // Event handlers use sendUpdateStatus only — no direct log calls so
+  // there is no risk of a "log is not defined" error reaching the renderer.
+  autoUpdater.on('checking-for-update',  ()     => sendUpdateStatus({ type: 'checking' }));
+  autoUpdater.on('update-available',     (info) => sendUpdateStatus({ type: 'available',   version: info.version }));
+  autoUpdater.on('update-not-available', ()     => sendUpdateStatus({ type: 'up-to-date' }));
+  autoUpdater.on('download-progress',    (prog) => sendUpdateStatus({ type: 'downloading', percent: Math.round(prog.percent) }));
 
   autoUpdater.on('update-downloaded', (info) => {
-    log.info('Update downloaded:', info.version);
     sendUpdateStatus({ type: 'ready', version: info.version });
     dialog.showMessageBox(mainWindow, {
       type: 'info',
@@ -240,11 +223,13 @@ function initAutoUpdater() {
   });
 
   autoUpdater.on('error', (err) => {
-    log.error('Auto-updater error:', err.message);
+    console.error('Auto-updater error:', err.message);
     sendUpdateStatus({ type: 'error', message: err.message });
   });
 
-  autoUpdater.checkForUpdates();
+  // Delay the first check so the renderer window is fully loaded and ready
+  // to receive status events before they start firing.
+  setTimeout(() => autoUpdater.checkForUpdates(), 3000);
 }
 
 app.whenReady().then(() => {
@@ -645,11 +630,87 @@ ipcMain.handle('get-admin-stats', async () => {
       supabase.from('addons').select('*', { count: 'exact', head: true }).eq('status', 'approved'),
       supabase.from('reviews').select('*', { count: 'exact', head: true }),
       supabase.from('addons').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
-      supabase.from('reports').select('*', { count: 'exact', head: true }),
+      supabase.from('reports').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
     ]);
     return { success: true, users: users.count || 0, addons: addons.count || 0,
       reviews: reviews.count || 0, pending: pending.count || 0, reports: reports.count || 0 };
   } catch { return { success: false }; }
+});
+
+// Fetch pending reports with reporter profile and target content
+ipcMain.handle('get-reports', async () => {
+  try {
+    const { data: reports, error } = await supabase
+      .from('reports').select('*').eq('status', 'pending')
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    if (!reports?.length) return { success: true, data: [] };
+
+    // Reporter profiles
+    const reporterIds = [...new Set(reports.map(r => r.reporter_id).filter(Boolean))];
+    const { data: profiles } = reporterIds.length
+      ? await supabase.from('profiles').select('id, username').in('id', reporterIds)
+      : { data: [] };
+    const pm = Object.fromEntries((profiles || []).map(p => [p.id, p]));
+
+    // Fetch target content by type
+    const byType = (type) => reports.filter(r => r.target_type === type).map(r => r.target_id);
+    const addonIds  = byType('addon');
+    const packIds   = byType('pack');
+    const reviewIds = byType('review');
+    const userIds   = byType('user');
+
+    const [addons, packs, reviews, users] = await Promise.all([
+      addonIds.length  ? supabase.from('addons').select('id, name, status').in('id', addonIds)          : { data: [] },
+      packIds.length   ? supabase.from('addon_packs').select('id, name, status').in('id', packIds)       : { data: [] },
+      reviewIds.length ? supabase.from('reviews').select('id, review_text, rating').in('id', reviewIds)  : { data: [] },
+      userIds.length   ? supabase.from('profiles').select('id, username').in('id', userIds)              : { data: [] },
+    ]);
+
+    const tm = {
+      addon:  Object.fromEntries((addons.data  || []).map(x => [x.id, x])),
+      pack:   Object.fromEntries((packs.data   || []).map(x => [x.id, x])),
+      review: Object.fromEntries((reviews.data || []).map(x => [x.id, x])),
+      user:   Object.fromEntries((users.data   || []).map(x => [x.id, x])),
+    };
+
+    return {
+      success: true,
+      data: reports.map(r => ({
+        ...r,
+        reporter: pm[r.reporter_id] || null,
+        target:   tm[r.target_type]?.[r.target_id] || null,
+      }))
+    };
+  } catch (error) {
+    console.error('get-reports error:', error.message);
+    return { success: false, error: error.message };
+  }
+});
+
+// Resolve a report — optionally take action on the reported content
+ipcMain.handle('resolve-report', async (_event, { reportId, status, action, targetType, targetId }) => {
+  try {
+    // Mark the report resolved
+    const { error: re } = await supabase.from('reports').update({
+      status, action_taken: action, resolved_at: new Date().toISOString()
+    }).eq('id', reportId);
+    if (re) throw re;
+
+    // Act on the reported content
+    if (action === 'hide_addon') {
+      await supabase.from('addons').update({ status: 'hidden' }).eq('id', targetId);
+    } else if (action === 'hide_pack') {
+      await supabase.from('addon_packs').update({ status: 'hidden' }).eq('id', targetId);
+    } else if (action === 'delete_review') {
+      await supabase.from('reviews').delete().eq('id', targetId);
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('resolve-report error:', error.message);
+    return { success: false, error: error.message };
+  }
 });
 
 // Submit a report
@@ -657,6 +718,93 @@ ipcMain.handle('submit-report', async (_event, { reporterId, targetType, targetI
   try {
     const { error } = await supabase.from('reports')
       .insert({ reporter_id: reporterId, target_type: targetType, target_id: targetId, reason });
+    if (error) throw error;
+    return { success: true };
+  } catch (error) { return { success: false, error: error.message }; }
+});
+
+// ==========================================
+// ADDON PACK HANDLERS
+// ==========================================
+
+ipcMain.handle('get-packs', async () => {
+  try {
+    const { data: packs, error } = await supabase
+      .from('addon_packs').select('*').order('created_at', { ascending: false });
+    if (error) throw error;
+    if (!packs?.length) return { success: true, data: [] };
+
+    const authorIds = [...new Set(packs.map(p => p.author_id).filter(Boolean))];
+    const { data: profiles } = authorIds.length
+      ? await supabase.from('profiles').select('id, username, avatar_url').in('id', authorIds)
+      : { data: [] };
+    const pm = Object.fromEntries((profiles || []).map(p => [p.id, p]));
+
+    const packIds = packs.map(p => p.id);
+    const { data: items } = await supabase
+      .from('addon_pack_items').select('pack_id').in('pack_id', packIds);
+    const countMap = {};
+    (items || []).forEach(i => { countMap[i.pack_id] = (countMap[i.pack_id] || 0) + 1; });
+
+    return { success: true, data: packs.map(p => ({
+      ...p, author: pm[p.author_id] || null, addon_count: countMap[p.id] || 0,
+    })) };
+  } catch (error) { return { success: false, error: error.message }; }
+});
+
+ipcMain.handle('get-pack-detail', async (_event, packId) => {
+  try {
+    const { data: pack, error } = await supabase
+      .from('addon_packs').select('*').eq('id', packId).maybeSingle();
+    if (error) throw error;
+    if (!pack) return { success: false };
+
+    const { data: items } = await supabase
+      .from('addon_pack_items').select('id, addon_id, optional, sort_order')
+      .eq('pack_id', packId).order('sort_order', { ascending: true });
+
+    const addonIds = (items || []).map(i => i.addon_id);
+    const { data: addons } = addonIds.length
+      ? await supabase.from('addons')
+          .select('id, name, author, description, folder_name, download_url, tags, reviews(rating)')
+          .in('id', addonIds)
+      : { data: [] };
+    const addonMap = Object.fromEntries((addons || []).map(a => [a.id, a]));
+
+    const { data: author } = await supabase
+      .from('profiles').select('id, username, avatar_url').eq('id', pack.author_id).maybeSingle();
+
+    return { success: true, data: {
+      ...pack, author: author || null,
+      items: (items || []).map(i => ({ ...i, addon: addonMap[i.addon_id] || null })).filter(i => i.addon),
+    } };
+  } catch (error) { return { success: false, error: error.message }; }
+});
+
+ipcMain.handle('create-pack', async (_event, { name, description, tags, authorId, items }) => {
+  try {
+    const { data: pack, error: pe } = await supabase
+      .from('addon_packs')
+      .insert({ name, description, tags: tags || [], author_id: authorId, status: 'pending' })
+      .select().single();
+    if (pe) throw pe;
+
+    if (items?.length) {
+      const { error: ie } = await supabase.from('addon_pack_items').insert(
+        items.map((item, i) => ({
+          pack_id: pack.id, addon_id: item.addonId,
+          optional: item.optional || false, sort_order: i,
+        }))
+      );
+      if (ie) throw ie;
+    }
+    return { success: true, id: pack.id };
+  } catch (error) { return { success: false, error: error.message }; }
+});
+
+ipcMain.handle('delete-pack', async (_event, packId) => {
+  try {
+    const { error } = await supabase.from('addon_packs').delete().eq('id', packId);
     if (error) throw error;
     return { success: true };
   } catch (error) { return { success: false, error: error.message }; }
