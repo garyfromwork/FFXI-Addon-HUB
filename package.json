@@ -1,6 +1,6 @@
 {
   "name": "ffxi-addon-hub",
-  "version": "1.0.13",
+  "version": "1.0.14",
   "description": "FFXI Windower Addon Manager",
   "main": "main.js",
   "author": "Garyfromwork",
@@ -50,16 +50,20 @@
     },
     "linux": {
       "target": [
-        {
-          "target": "AppImage",
-          "arch": [
-            "x64"
-          ]
-        }
+        { "target": "AppImage", "arch": ["x64"] },
+        { "target": "deb",      "arch": ["x64"] },
+        { "target": "rpm",      "arch": ["x64"] }
       ],
       "icon": "assets/icon.png",
       "category": "Game",
-      "description": "FFXI Windower Addon Manager"
+      "description": "FFXI Windower Addon Manager",
+      "maintainer": "Garyfromwork"
+    },
+    "deb": {
+      "depends": []
+    },
+    "rpm": {
+      "depends": []
     }
   },
   "devDependencies": {

@@ -22,11 +22,29 @@ Go to the [**Releases**](../../releases/latest) page and grab the file for your 
 | Platform | File |
 |---|---|
 | Windows | `FFXI-Addon-HUB-Setup-x.x.x.exe` |
-| Linux | `FFXI-Addon-HUB-x.x.x.AppImage` |
+| Ubuntu / Debian | `ffxi-addon-hub_x.x.x_amd64.deb` |
+| Fedora / RHEL / openSUSE | `ffxi-addon-hub-x.x.x.x86_64.rpm` |
+| Any Linux (universal) | `FFXI-Addon-HUB-x.x.x.AppImage` |
 
 **Windows:** Run the installer — it creates a Start Menu shortcut and desktop icon.
 
-**Linux:** Make the AppImage executable and run it: `chmod +x FFXI-Addon-HUB-*.AppImage && ./FFXI-Addon-HUB-*.AppImage`
+**Debian / Ubuntu:**
+```bash
+sudo dpkg -i ffxi-addon-hub_*.deb
+```
+
+**Fedora / RHEL / openSUSE:**
+```bash
+sudo rpm -i ffxi-addon-hub-*.rpm
+# or with dnf:
+sudo dnf install ffxi-addon-hub-*.rpm
+```
+
+**AppImage (any distro):**
+```bash
+chmod +x FFXI-Addon-HUB-*.AppImage && ./FFXI-Addon-HUB-*.AppImage
+```
+
 If you run FFXI through Wine, point the Windower path to your Wine prefix location (e.g. `~/.wine/drive_c/Windower`).
 
 The app checks for updates automatically on every launch.
