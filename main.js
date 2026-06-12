@@ -1247,3 +1247,69 @@ ipcMain.handle('logout-user', async () => {
     return { success: false, error: error.message };
   }
 });
+
+ipcMain.handle('get-announcement', async () => {
+  try {
+    const { data, error } = await supabase
+      .from('announcements')
+      .select('*')
+      .eq('active', true)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('get-announcement error:', error.message);
+    return null;
+  }
+});
+
+ipcMain.handle('get-announcements', async () => {
+  try {
+    const { data, error } = await supabase
+      .from('announcements')
+      .select('*')
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return { success: true, data };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('create-announcement', async (event, { badge, title, subtitle, items }) => {
+  try {
+    await supabase.from('announcements').update({ active: false }).eq('active', true);
+    const { data, error } = await supabase
+      .from('announcements')
+      .insert({ badge, title, subtitle, items, active: true })
+      .select()
+      .single();
+    if (error) throw error;
+    return { success: true, data };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('toggle-announcement', async (event, { id, active }) => {
+  try {
+    if (active) await supabase.from('announcements').update({ active: false }).eq('active', true);
+    const { error } = await supabase.from('announcements').update({ active }).eq('id', id);
+    if (error) throw error;
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('delete-announcement', async (event, id) => {
+  try {
+    const { error } = await supabase.from('announcements').delete().eq('id', id);
+    if (error) throw error;
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
