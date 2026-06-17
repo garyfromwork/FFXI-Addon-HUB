@@ -928,7 +928,8 @@ ipcMain.handle('get-addons', async () => {
   try {
     const { data, error } = await supabase
       .from('addons')
-      .select('*, reviews(rating)');
+      .select('*, reviews(rating)')
+      .eq('status', 'approved');
     if (error) throw error;
     return { success: true, data };
   } catch (error) {

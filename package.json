@@ -1,6 +1,6 @@
 {
   "name": "ffxi-addon-hub",
-  "version": "1.1.0",
+  "version": "1.1.2",
   "description": "FFXI Windower Addon Manager",
   "main": "main.js",
   "author": "Garyfromwork",
@@ -9,7 +9,7 @@
   "scripts": {
     "start": "electron .",
     "build": "electron-builder --publish=never",
-    "release": "electron-builder --publish=always"
+    "release": "electron-builder --win --linux --publish=always"
   },
   "build": {
     "appId": "com.ffxi.addon-manager",
@@ -50,9 +50,7 @@
     },
     "linux": {
       "target": [
-        { "target": "AppImage", "arch": ["x64"] },
-        { "target": "deb",      "arch": ["x64"] },
-        { "target": "rpm",      "arch": ["x64"] }
+        { "target": "zip", "arch": ["x64"] }
       ],
       "icon": "assets/icon.png",
       "category": "Game",
