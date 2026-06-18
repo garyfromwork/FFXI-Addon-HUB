@@ -961,6 +961,7 @@
           </div>
           <div class="detail-actions">
             <span id="d-badge"></span>
+            <button class="btn btn-ghost btn-sm hidden" id="d-edit-btn">✏ Edit Addon</button>
             <button class="btn btn-ghost btn-sm hidden" id="d-report-btn" style="color:var(--text-muted);">⚑ Report</button>
             <button class="btn btn-ghost btn-sm hidden" id="d-repo-btn">View Source ↗</button>
             <button class="btn btn-primary" id="d-install-btn">Install</button>
@@ -1300,6 +1301,7 @@
       isAdmin: false,
       activeTag: '',
       reportTarget: null, // { type, id, label }
+      editingAddon: null, // addon object when editing, null when creating new
     };
 
     // ────────────────────────────────────────────
@@ -1598,9 +1600,18 @@
         ? '<span class="badge-installed">✓ Installed</span>'
         : isPending ? '<span class="badge-pending">⏳ Pending Review</span>' : '';
 
+      // Edit button — only visible to the submitter
+      const editBtn = document.getElementById('d-edit-btn');
+      const isOwner = S.user && S.user.id === addon.submitted_by;
+      editBtn.classList.toggle('hidden', !isOwner);
+      editBtn.onclick = () => {
+        document.getElementById('detail-overlay').classList.add('hidden');
+        openSubmitForm(addon);
+      };
+
       // Report button — visible to logged-in users who didn't submit this addon
       const reportBtn = document.getElementById('d-report-btn');
-      reportBtn.classList.toggle('hidden', !S.user);
+      reportBtn.classList.toggle('hidden', !S.user || isOwner);
       reportBtn.onclick = () => openReportModal('addon', addon.id, addon.name);
 
       // Repository link
@@ -2103,7 +2114,48 @@
         </div>
 
         <div class="fstatus" id="save-status" style="margin-top:14px;text-align:center;font-size:13px;"></div>
+
+        <div class="settings-group-title" style="margin-top:28px;">My Submissions</div>
+        <div id="my-submissions-list"><div class="loading-state" style="padding:16px 0;">Loading…</div></div>
       `;
+
+      // Load my submissions
+      window.electronAPI.getMyAddons(S.user.id).then(res => {
+        const el = document.getElementById('my-submissions-list');
+        if (!el) return;
+        if (!res.success || !res.data.length) {
+          el.innerHTML = '<div style="font-size:13px;color:var(--text-muted);padding:8px 0;">You haven\'t submitted any addons yet.</div>';
+          return;
+        }
+        const statusMeta = {
+          pending:  { label: 'Pending Review', color: 'var(--accent)',  bg: 'var(--accent-dim)' },
+          approved: { label: 'Approved',        color: 'var(--green)',   bg: 'rgba(60,179,113,.12)' },
+          rejected: { label: 'Rejected',        color: 'var(--red)',     bg: 'rgba(224,82,82,.12)' },
+          hidden:   { label: 'Hidden',          color: 'var(--text-muted)', bg: 'var(--bg-elevated)' },
+        };
+        el.innerHTML = res.data.map(a => {
+          const sm = statusMeta[a.status] || statusMeta.pending;
+          return `<div class="settings-row" style="cursor:default;">
+            <div class="settings-body" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+              <div style="min-width:0;">
+                <div style="font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${esc(a.name)}</div>
+                <div style="font-size:12px;color:var(--text-sub);margin-top:2px;">by ${esc(a.author)}
+                  &nbsp;·&nbsp;
+                  <span style="font-size:10px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;
+                    padding:2px 8px;border-radius:20px;color:${sm.color};background:${sm.bg};">${sm.label}</span>
+                </div>
+              </div>
+              <button class="btn btn-outline btn-sm js-edit-my-addon" data-id="${esc(a.id)}" style="flex-shrink:0;">✏ Edit</button>
+            </div>
+          </div>`;
+        }).join('');
+        el.querySelectorAll('.js-edit-my-addon').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const addon = res.data.find(a => a.id === btn.dataset.id);
+            if (addon) openSubmitForm(addon);
+          });
+        });
+      });
 
       // Live name preview
       document.getElementById('edit-username').addEventListener('input', e => {
@@ -2963,20 +3015,50 @@
     // ────────────────────────────────────────────
     // SUBMIT ADDON
     // ────────────────────────────────────────────
-    document.getElementById('btn-open-submit').addEventListener('click', () => {
-      ['sub-github','sub-name','sub-author','sub-desc','sub-folder','sub-url','sub-repo','sub-ss-1','sub-ss-2','sub-ss-3'].forEach(id => {
-        document.getElementById(id).value = '';
-      });
+    function openSubmitForm(addonToEdit) {
+      S.editingAddon = addonToEdit || null;
+      const isEdit   = !!S.editingAddon;
+
+      // Update modal title and button label
+      document.querySelector('#submit-overlay .modal-head-title').textContent =
+        isEdit ? 'Edit Addon' : 'Submit an Addon';
+      document.querySelector('#submit-overlay .modal-head-sub').textContent =
+        isEdit ? 'Update your addon details — it will re-enter the review queue.' : 'Share a Windower addon with the FFXI community';
+      document.getElementById('btn-do-submit').textContent =
+        isEdit ? 'Save Changes' : 'Submit for Review';
+
+      // Clear / pre-fill fields
+      const a = addonToEdit || {};
+      document.getElementById('sub-github').value   = '';
+      document.getElementById('sub-name').value     = a.name         || '';
+      document.getElementById('sub-author').value   = a.author       || '';
+      document.getElementById('sub-desc').value     = a.description  || '';
+      document.getElementById('sub-folder').value   = a.folder_name  || '';
+      document.getElementById('sub-url').value      = a.download_url || '';
+      document.getElementById('sub-repo').value     = a.repository_url || '';
+      const shots = Array.isArray(a.screenshots) ? a.screenshots : [];
+      document.getElementById('sub-ss-1').value = shots[0] || '';
+      document.getElementById('sub-ss-2').value = shots[1] || '';
+      document.getElementById('sub-ss-3').value = shots[2] || '';
       document.getElementById('sub-github-status').textContent = '';
-      document.getElementById('submit-status').textContent = '';
+      document.getElementById('submit-status').textContent     = '';
       document.getElementById('sub-upload-status').textContent = '';
-      buildTagPicker('sub-tag-grid', []);
+      buildTagPicker('sub-tag-grid', Array.isArray(a.tags) ? a.tags : []);
+
+      // Hide the repo URL auto-fill row when editing (less confusing)
+      document.getElementById('sub-github').closest('.fg').style.display = isEdit ? 'none' : '';
+      document.querySelector('#submit-overlay .modal-body-pad > div[style*="height:1px"]').style.display = isEdit ? 'none' : '';
+
       document.getElementById('submit-overlay').classList.remove('hidden');
-      document.getElementById('sub-github').focus();
-    });
+      if (!isEdit) document.getElementById('sub-github').focus();
+      else         document.getElementById('sub-name').focus();
+    }
+
+    document.getElementById('btn-open-submit').addEventListener('click', () => openSubmitForm(null));
 
     document.getElementById('close-submit').addEventListener('click', () => {
       document.getElementById('submit-overlay').classList.add('hidden');
+      S.editingAddon = null;
     });
 
     // Multi-platform auto-fill dispatcher
@@ -3128,25 +3210,38 @@
       }
 
       btn.disabled = true;
-      statusEl.textContent = 'Submitting…';
+      statusEl.textContent = S.editingAddon ? 'Saving…' : 'Submitting…';
       statusEl.className   = 'fstatus';
 
       const tags = getSelectedTags('sub-tag-grid');
-      const res = await window.electronAPI.submitAddon({
-        name, author, description, folder_name, download_url,
-        repository_url, screenshots, tags, submittedBy: S.user.id
-      });
+
+      let res;
+      if (S.editingAddon) {
+        res = await window.electronAPI.updateAddon({
+          addonId: S.editingAddon.id,
+          name, author, description, folder_name, download_url,
+          repository_url, screenshots, tags,
+        });
+      } else {
+        res = await window.electronAPI.submitAddon({
+          name, author, description, folder_name, download_url,
+          repository_url, screenshots, tags, submittedBy: S.user.id
+        });
+      }
 
       if (res.success) {
-        statusEl.textContent = '✓ Submitted for review! It will appear in Browse once approved.';
-        statusEl.className   = 'fstatus ok';
+        statusEl.textContent = S.editingAddon
+          ? '✓ Saved! Your addon is back in the review queue.'
+          : '✓ Submitted for review! It will appear in Browse once approved.';
+        statusEl.className = 'fstatus ok';
+        S.editingAddon = null;
         btn.disabled = false;
         setTimeout(() => {
           document.getElementById('submit-overlay').classList.add('hidden');
           loadAddons();
         }, 2200);
       } else {
-        statusEl.textContent = res.error || 'Submission failed.';
+        statusEl.textContent = res.error || (S.editingAddon ? 'Save failed.' : 'Submission failed.');
         statusEl.className   = 'fstatus err';
         btn.disabled = false;
       }

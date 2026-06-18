@@ -53,6 +53,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getPackDetail:       (id)     => ipcRenderer.invoke('get-pack-detail', id),
   createPack:          (data)   => ipcRenderer.invoke('create-pack', data),
   deletePack:          (id)     => ipcRenderer.invoke('delete-pack', id),
+  getMyAddons:         (userId) => ipcRenderer.invoke('get-my-addons', userId),
+  updateAddon:         (data)   => ipcRenderer.invoke('update-addon', data),
   getAnnouncement:     ()       => ipcRenderer.invoke('get-announcement'),
   getAnnouncements:    ()       => ipcRenderer.invoke('get-announcements'),
   createAnnouncement:  (data)   => ipcRenderer.invoke('create-announcement', data),

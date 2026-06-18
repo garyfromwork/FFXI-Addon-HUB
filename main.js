@@ -923,6 +923,39 @@ ipcMain.handle('submit-addon', async (event, { name, author, description, folder
   }
 });
 
+ipcMain.handle('get-my-addons', async (event, userId) => {
+  try {
+    const { data, error } = await supabase
+      .from('addons')
+      .select('*')
+      .eq('submitted_by', userId)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return { success: true, data };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('update-addon', async (event, { addonId, name, author, description, folder_name, download_url, repository_url, screenshots, tags }) => {
+  try {
+    const { error } = await supabase
+      .from('addons')
+      .update({
+        name, author, description, folder_name, download_url,
+        repository_url: repository_url || null,
+        screenshots:    screenshots    || [],
+        tags:           tags           || [],
+        status:         'pending',
+      })
+      .eq('id', addonId);
+    if (error) throw error;
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
 // Fetch Addons — includes nested review ratings so cards can show avg stars
 ipcMain.handle('get-addons', async () => {
   try {
