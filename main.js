@@ -1064,6 +1064,54 @@ ipcMain.handle('get-reviews', async (event, addonId) => {
 });
 
 // Upload Avatar to Supabase Storage
+ipcMain.handle('upload-screenshot', async (event, { userId, slot }) => {
+  try {
+    const result = await dialog.showOpenDialog({
+      properties: ['openFile'],
+      filters: [{ name: 'Images', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp'] }]
+    });
+    if (result.canceled) return { canceled: true };
+
+    const filePath = result.filePaths[0];
+    const ext = path.extname(filePath).substring(1).toLowerCase();
+    const fileBuffer = fs.readFileSync(filePath);
+
+    const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
+    if (fileBuffer.length > MAX_BYTES) {
+      return { success: false, error: 'Image must be under 5 MB.' };
+    }
+
+    const storagePath = `${userId}/${Date.now()}-slot${slot}.${ext}`;
+    const { error: uploadError } = await supabase.storage
+      .from('screenshots')
+      .upload(storagePath, fileBuffer, {
+        contentType: `image/${ext === 'jpg' ? 'jpeg' : ext}`,
+        upsert: false
+      });
+    if (uploadError) throw uploadError;
+
+    const { data: urlData } = supabase.storage.from('screenshots').getPublicUrl(storagePath);
+    return { success: true, url: urlData.publicUrl };
+  } catch (error) {
+    console.error('upload-screenshot error:', error.message);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('delete-my-addon', async (event, { addonId, userId }) => {
+  try {
+    const { error } = await supabase
+      .from('addons')
+      .delete()
+      .eq('id', addonId)
+      .eq('submitted_by', userId);
+    if (error) throw error;
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
 ipcMain.handle('upload-avatar', async (event, userId) => {
   try {
     const result = await dialog.showOpenDialog({

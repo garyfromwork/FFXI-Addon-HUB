@@ -1074,10 +1074,28 @@
       </div>
 
       <div class="fg">
-        <label class="fl">Screenshots <span style="color:var(--text-muted);font-weight:400;text-transform:none;letter-spacing:0;">— optional, up to 3 direct image URLs</span></label>
-        <input type="text" id="sub-ss-1" class="fi" placeholder="https://i.imgur.com/example1.png">
-        <input type="text" id="sub-ss-2" class="fi" style="margin-top:6px;" placeholder="https://i.imgur.com/example2.png">
-        <input type="text" id="sub-ss-3" class="fi" style="margin-top:6px;" placeholder="https://i.imgur.com/example3.png">
+        <label class="fl">Screenshots <span style="color:var(--text-muted);font-weight:400;text-transform:none;letter-spacing:0;">— optional, up to 3 images</span></label>
+        <div style="display:flex;flex-direction:column;gap:8px;" id="screenshot-fields">
+          <!-- slot 1 -->
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="text" id="sub-ss-1" class="fi" style="flex:1;margin:0;" placeholder="Paste URL or upload…">
+            <button class="btn btn-outline btn-sm js-ss-upload" data-slot="1" type="button" style="flex-shrink:0;">⬆ Upload</button>
+            <div class="js-ss-preview" data-slot="1" style="width:36px;height:36px;border-radius:var(--r);border:1px solid var(--border);background:var(--bg-input);flex-shrink:0;overflow:hidden;"></div>
+          </div>
+          <!-- slot 2 -->
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="text" id="sub-ss-2" class="fi" style="flex:1;margin:0;" placeholder="Paste URL or upload…">
+            <button class="btn btn-outline btn-sm js-ss-upload" data-slot="2" type="button" style="flex-shrink:0;">⬆ Upload</button>
+            <div class="js-ss-preview" data-slot="2" style="width:36px;height:36px;border-radius:var(--r);border:1px solid var(--border);background:var(--bg-input);flex-shrink:0;overflow:hidden;"></div>
+          </div>
+          <!-- slot 3 -->
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input type="text" id="sub-ss-3" class="fi" style="flex:1;margin:0;" placeholder="Paste URL or upload…">
+            <button class="btn btn-outline btn-sm js-ss-upload" data-slot="3" type="button" style="flex-shrink:0;">⬆ Upload</button>
+            <div class="js-ss-preview" data-slot="3" style="width:36px;height:36px;border-radius:var(--r);border:1px solid var(--border);background:var(--bg-input);flex-shrink:0;overflow:hidden;"></div>
+          </div>
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:6px;">Upload files (max 5 MB each) or paste a direct image URL. Thumbnails preview when a URL is set.</div>
       </div>
 
       <div class="fg">
@@ -1085,11 +1103,14 @@
         <div class="tag-check-grid" id="sub-tag-grid"></div>
       </div>
 
-      <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;background:var(--bg-elevated);padding:10px 12px;border-radius:var(--r);">
+      <div style="font-size:12px;color:var(--text-muted);margin-bottom:14px;background:var(--bg-elevated);padding:10px 12px;border-radius:var(--r);" id="sub-review-notice">
         ⚑ Submissions are reviewed before appearing in Browse. You'll be able to see your pending submission in the addon list while it awaits approval.
       </div>
 
-      <button class="btn btn-primary btn-full" id="btn-do-submit">Submit for Review</button>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-primary" style="flex:1;" id="btn-do-submit">Submit for Review</button>
+        <button class="btn btn-danger btn-sm hidden" id="btn-delete-addon" type="button">🗑 Remove Addon</button>
+      </div>
       <div class="fstatus" id="submit-status" style="margin-top:8px;text-align:center;"></div>
       </div><!-- end modal-body-pad -->
     </div>
@@ -3049,6 +3070,34 @@
       document.getElementById('sub-github').closest('.fg').style.display = isEdit ? 'none' : '';
       document.querySelector('#submit-overlay .modal-body-pad > div[style*="height:1px"]').style.display = isEdit ? 'none' : '';
 
+      // Show/hide delete button and review notice
+      document.getElementById('btn-delete-addon').classList.toggle('hidden', !isEdit);
+      document.getElementById('sub-review-notice').style.display = isEdit
+        ? 'none' : '';
+      if (isEdit) {
+        document.getElementById('sub-review-notice').style.display = '';
+        document.getElementById('sub-review-notice').textContent =
+          '⚑ Saving will re-submit this addon for moderator review before it goes live.';
+      } else {
+        document.getElementById('sub-review-notice').textContent =
+          '⚑ Submissions are reviewed before appearing in Browse. You\'ll be able to see your pending submission in the addon list while it awaits approval.';
+      }
+
+      // Refresh screenshot previews whenever a URL input changes
+      function refreshPreview(slot) {
+        const url = document.getElementById(`sub-ss-${slot}`).value.trim();
+        const preview = document.querySelector(`.js-ss-preview[data-slot="${slot}"]`);
+        if (!preview) return;
+        preview.innerHTML = url
+          ? `<img src="${url}" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display='none'">`
+          : '';
+      }
+      [1, 2, 3].forEach(slot => {
+        const input = document.getElementById(`sub-ss-${slot}`);
+        input.addEventListener('input', () => refreshPreview(slot));
+        refreshPreview(slot);
+      });
+
       document.getElementById('submit-overlay').classList.remove('hidden');
       if (!isEdit) document.getElementById('sub-github').focus();
       else         document.getElementById('sub-name').focus();
@@ -3059,6 +3108,41 @@
     document.getElementById('close-submit').addEventListener('click', () => {
       document.getElementById('submit-overlay').classList.add('hidden');
       S.editingAddon = null;
+    });
+
+    // Screenshot upload buttons
+    document.getElementById('screenshot-fields').addEventListener('click', async e => {
+      const btn = e.target.closest('.js-ss-upload');
+      if (!btn || !S.user) return;
+      const slot = btn.dataset.slot;
+      btn.disabled = true;
+      btn.textContent = '…';
+      const res = await window.electronAPI.uploadScreenshot({ userId: S.user.id, slot });
+      btn.disabled = false;
+      btn.textContent = '⬆ Upload';
+      if (res.canceled) return;
+      if (!res.success) { toast(res.error || 'Upload failed.', true); return; }
+      const input = document.getElementById(`sub-ss-${slot}`);
+      input.value = res.url;
+      input.dispatchEvent(new Event('input')); // trigger preview refresh
+    });
+
+    // Delete addon button
+    document.getElementById('btn-delete-addon').addEventListener('click', async () => {
+      if (!S.editingAddon) return;
+      if (!confirm(`Permanently remove "${S.editingAddon.name}"? This cannot be undone.`)) return;
+      const btn = document.getElementById('btn-delete-addon');
+      btn.disabled = true;
+      const res = await window.electronAPI.deleteMyAddon({ addonId: S.editingAddon.id, userId: S.user.id });
+      if (res.success) {
+        document.getElementById('submit-overlay').classList.add('hidden');
+        S.editingAddon = null;
+        toast('Addon removed.');
+        loadAddons();
+      } else {
+        toast(res.error || 'Delete failed.', true);
+        btn.disabled = false;
+      }
     });
 
     // Multi-platform auto-fill dispatcher
